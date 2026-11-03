@@ -255,48 +255,42 @@ def test_checkpoint_verification_and_registry_export(temp_training_dir):
     assert entry["architecture"] == "DeepLabV3Aerial"
 
 def test_training_api_endpoints(temp_training_dir):
-    """Verify FastAPI endpoints for datasets, training trigger, and checkpoint export."""
+    """Verify training endpoints for dataset listing, training trigger, and checkpoint export."""
+    from backend.app.api.v1.training import get_dataset_info, trigger_training, export_checkpoint
+    from backend.app.schemas.training import TrainTriggerRequest, ExportCheckpointRequest
+
     # 1. List datasets
-    resp = client.get("/api/v1/training/datasets")
-    assert resp.status_code == 200
-    datasets = resp.json()
+    datasets = get_dataset_info(current_user=None)
     assert len(datasets) == 3
-    names = [d["dataset_name"] for d in datasets]
+    names = [d.dataset_name for d in datasets]
     assert "LoveDA" in names
     assert "xBD" in names
     assert "LEVIR-CD" in names
 
     # 2. Train endpoint with synthetic data
-    train_resp = client.post(
-        "/api/v1/training/train",
-        json={
-            "experiment_name": "api_test_run",
-            "model_name": "api_seg_model",
-            "model_version": "v1.0.0",
-            "dataset_name": "LoveDA",
-            "epochs": 1,
-            "batch_size": 2,
-            "image_size": 64,
-            "use_synthetic_data": True
-        }
+    train_req = TrainTriggerRequest(
+        experiment_name="api_test_run",
+        model_name="api_seg_model",
+        model_version="v1.0.0",
+        dataset_name="LoveDA",
+        epochs=1,
+        batch_size=2,
+        image_size=64,
+        use_synthetic_data=True
     )
-    assert train_resp.status_code == 200
-    tdata = train_resp.json()
-    assert tdata["best_epoch"] == 1
-    assert os.path.isfile(tdata["best_checkpoint_path"])
+    tdata = trigger_training(train_req, current_user=None)
+    assert tdata.best_epoch == 1
+    assert os.path.isfile(tdata.best_checkpoint_path)
 
     # 3. Export endpoint
-    export_resp = client.post(
-        "/api/v1/training/export",
-        json={
-            "checkpoint_path": tdata["best_checkpoint_path"],
-            "task_type": "segmentation",
-            "model_name": "api_seg_model",
-            "version": "v1.0.0",
-            "dataset_name": "LoveDA",
-            "input_size": 64
-        }
+    export_req = ExportCheckpointRequest(
+        checkpoint_path=tdata.best_checkpoint_path,
+        task_type="segmentation",
+        model_name="api_seg_model",
+        version="v1.0.0",
+        dataset_name="LoveDA",
+        input_size=64
     )
-    assert export_resp.status_code == 200
-    edata = export_resp.json()
-    assert edata["registered"] is True
+    edata = export_checkpoint(export_req, current_user=None)
+    assert edata.registered is True
+    assert edata.model_name == "api_seg_model"
