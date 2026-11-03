@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # JATAYUV-AI: Integrated Aerial Intelligence Platform
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org/)
@@ -61,3 +62,6 @@ JATAYUV/
 └── docker/                 # Containerization files (Dockerfiles & docker-compose)
 ```
 
+=======
+# JATAYUV
+>>>>>>> 3088f55381c1c2ac09d02fbf6a8daf656dff1981
