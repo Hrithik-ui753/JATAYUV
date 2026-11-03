@@ -69,3 +69,4 @@ def test_frontend_manifest_and_config():
     for c in configs:
         full_path = os.path.join(base_dir, c)
         assert os.path.exists(full_path), f"Configuration file {c} is missing"
+

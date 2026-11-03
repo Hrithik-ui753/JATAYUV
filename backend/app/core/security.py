@@ -1,0 +1,52 @@
+import hashlib
+import secrets
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Any, Union
+from jose import jwt, JWTError
+import bcrypt
+from backend.app.core.config import settings
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    except Exception:
+        return False
+
+def get_password_hash(password: str) -> str:
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
+
+def create_access_token(subject: Union[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    to_encode = {"exp": expire, "sub": str(subject), "type": "access"}
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return encoded_jwt
+
+def decode_access_token(token: str) -> Optional[str]:
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") != "access":
+            return None
+        return payload.get("sub")
+    except JWTError:
+        return None
+
+# --- Refresh Token Helpers ---
+
+def generate_refresh_token() -> str:
+    """Generate a secure random refresh token string."""
+    return secrets.token_urlsafe(64)
+
+def hash_refresh_token(token: str) -> str:
+    """SHA-256 hash a refresh token before storage."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+def refresh_token_expiry() -> datetime:
+    """Return the expiry datetime for a new refresh token (30 days)."""
+    return datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+

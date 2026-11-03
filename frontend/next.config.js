@@ -6,6 +6,10 @@ const nextConfig = {
     domains: ["localhost", "127.0.0.1"],
     unoptimized: true,
   },
+  webpack: (config) => {
+    config.cache = false;
+    return config;
+  },
   async rewrites() {
     return [
       {
@@ -21,4 +25,3 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
-

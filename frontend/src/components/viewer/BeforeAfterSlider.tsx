@@ -45,7 +45,7 @@ export function BeforeAfterSlider({
     <div
       ref={containerRef}
       className={cn(
-        "relative w-full aspect-[16/10] overflow-hidden rounded-xl border border-border select-none cursor-ew-resize bg-secondary/50",
+        "relative w-full aspect-[16/10] overflow-hidden rounded-lg border border-emerald-500/30 select-none cursor-ew-resize bg-forest-950",
         className
       )}
       onMouseDown={() => setIsDragging(true)}
@@ -62,7 +62,7 @@ export function BeforeAfterSlider({
         alt={afterLabel}
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
       />
-      <span className="absolute top-3 right-3 px-2.5 py-1 text-xs font-semibold rounded bg-black/70 backdrop-blur text-white border border-white/10 z-10">
+      <span className="absolute top-3 right-3 px-2.5 py-1 text-xs font-mono font-semibold rounded bg-forest-950/80 backdrop-blur text-emerald-300 border border-emerald-500/30 z-10">
         {afterLabel}
       </span>
 
@@ -77,17 +77,17 @@ export function BeforeAfterSlider({
           className="absolute inset-0 w-full h-full object-cover pointer-events-none"
           style={{ width: containerRef.current?.clientWidth || "100%", maxWidth: "none" }}
         />
-        <span className="absolute top-3 left-3 px-2.5 py-1 text-xs font-semibold rounded bg-black/70 backdrop-blur text-white border border-white/10 z-10">
+        <span className="absolute top-3 left-3 px-2.5 py-1 text-xs font-mono font-semibold rounded bg-forest-950/80 backdrop-blur text-gray-200 border border-white/20 z-10">
           {beforeLabel}
         </span>
       </div>
 
       {/* Slider Divider Line */}
       <div
-        className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_10px_rgba(0,0,0,0.5)] z-20"
+        className="absolute top-0 bottom-0 w-0.5 bg-emerald-400 shadow-[0_0_12px_rgba(0,245,160,0.8)] z-20"
         style={{ left: `${sliderPosition}%` }}
       >
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-primary border-2 border-white flex items-center justify-center text-white shadow-lg">
+        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-forest-900 border-2 border-emerald-400 flex items-center justify-center text-emerald-300 shadow-lg shadow-black">
           <MoveHorizontal className="w-4 h-4" />
         </div>
       </div>

@@ -3,34 +3,93 @@
 @tailwind utilities;
 
 :root {
-  --background: 222 47% 7%;
-  --foreground: 210 40% 98%;
-  --card: 222 47% 10%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222 47% 10%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 199 89% 48%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 217 33% 17%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217 33% 15%;
-  --muted-foreground: 215 20% 65%;
-  --accent: 217 33% 20%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 0 84% 60%;
+  /* Aerospace Forest-Black & Charcoal Spectrum */
+  --background: 160 25% 4%;       /* #050807 Deep forest-black */
+  --foreground: 150 15% 95%;      /* #EEF5F1 High-contrast mint off-white */
+  --card: 160 20% 6.5%;           /* #0A120E Dark forest slate */
+  --card-foreground: 150 15% 96%;
+  --popover: 160 20% 6.5%;
+  --popover-foreground: 150 15% 96%;
+  --primary: 158 80% 45%;         /* #10B981 Emerald core */
+  --primary-foreground: 160 30% 6%;
+  --secondary: 160 18% 11%;       /* #121E18 Tactical charcoal */
+  --secondary-foreground: 150 15% 90%;
+  --muted: 160 15% 9%;
+  --muted-foreground: 150 10% 55%;/* #7F9389 Muted technical label */
+  --accent: 158 70% 22%;          /* #0F4532 Deep emerald rim */
+  --accent-foreground: 150 30% 98%;
+  --destructive: 0 78% 54%;       /* #E11D48 Alert / destroyed */
   --destructive-foreground: 210 40% 98%;
-  --border: 217 33% 18%;
-  --input: 217 33% 18%;
-  --ring: 199 89% 48%;
-  --radius: 0.5rem;
+  --border: 160 20% 14%;          /* #162620 Fine technical border */
+  --input: 160 20% 12%;
+  --ring: 158 80% 45%;
+  --radius: 0.375rem;
 }
 
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
   overflow-x: hidden;
   min-height: 100vh;
+  letter-spacing: -0.01em;
+}
+
+/* Technical Aerospace Grid Background */
+.tech-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(16, 185, 129, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(16, 185, 129, 0.04) 1px, transparent 1px);
+}
+
+.tech-grid-fine {
+  background-size: 16px 16px;
+  background-image: 
+    linear-gradient(to right, rgba(16, 185, 129, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(16, 185, 129, 0.025) 1px, transparent 1px);
+}
+
+.tech-crosshair {
+  position: relative;
+}
+.tech-crosshair::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 8px;
+  height: 8px;
+  border-top: 1.5px solid rgba(16, 185, 129, 0.5);
+  border-left: 1.5px solid rgba(16, 185, 129, 0.5);
+}
+.tech-crosshair::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  border-bottom: 1.5px solid rgba(16, 185, 129, 0.5);
+  border-right: 1.5px solid rgba(16, 185, 129, 0.5);
+}
+
+/* Glass Panels */
+.glass-panel {
+  background: rgba(10, 18, 14, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(16, 185, 129, 0.16);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
+}
+
+.glass-panel-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glass-panel-hover:hover {
+  background: rgba(13, 23, 18, 0.85);
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 14px 40px -10px rgba(0, 0, 0, 0.8), 0 0 20px -5px rgba(16, 185, 129, 0.12);
 }
 
 /* Reduced motion preference */
@@ -49,12 +108,50 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: hsl(var(--background));
+  background: #050807;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-  border-radius: 3px;
+  background: #192b23;
+  border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground));
+  background: #10b981;
+}
+
+/* Tactical HUD corner indicators */
+.hud-corner-tl {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-top: 2px solid rgba(16, 185, 129, 0.6);
+  border-left: 2px solid rgba(16, 185, 129, 0.6);
+}
+.hud-corner-tr {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-top: 2px solid rgba(16, 185, 129, 0.6);
+  border-right: 2px solid rgba(16, 185, 129, 0.6);
+}
+.hud-corner-bl {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-bottom: 2px solid rgba(16, 185, 129, 0.6);
+  border-left: 2px solid rgba(16, 185, 129, 0.6);
+}
+.hud-corner-br {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-bottom: 2px solid rgba(16, 185, 129, 0.6);
+  border-right: 2px solid rgba(16, 185, 129, 0.6);
 }
