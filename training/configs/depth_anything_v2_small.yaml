@@ -1,0 +1,118 @@
+# JATAYUV — Depth Anything V2 Small fine-tuning configuration
+#
+# Every field here is recorded in the checkpoint and copied next to the run, so a
+# training run can always be reproduced exactly. Values are intentionally modest
+# because the reference workstation has no CUDA device (see docs/DEPTH_MODEL_TRAINING_PLAN.md).
+
+experiment:
+  name: exp_b_skyscenes_relative
+  seed: 42
+  output_dir: training/experiments/exp_b_skyscenes_relative
+  description: >
+    Fine-tune the official Depth Anything V2 Small checkpoint on dense relative
+    depth supervision from SkyScenes (UAV perspective, CARLA renderer, MIT licence).
+
+model:
+  name: depth_anything_v2_small
+  # Exactly the official Small preset (do not change to vitb/vitl/vitg).
+  encoder: vits
+  features: 64
+  out_channels: [48, 96, 192, 384]
+  pretrained_checkpoint: training/checkpoints/pretrained/depth_anything_v2_vits.pth
+  # Verified on 2026-11-04 from the official Depth-Anything-V2-Small release.
+  expected_sha256: 715fade13be8f229f8a70cc02066f656f2423a59effd0579197bbf57860e1378
+  expected_params: 24785089
+  finetune:
+    # full | decoder_only | last_n_blocks | gradual
+    freeze: last_n_blocks
+    unfreeze_last_n_blocks: 2
+    backbone_lr_scale: 0.1
+
+data:
+  manifest_name: skyscenes_relative
+  manifest: datasets/manifests/skyscenes_relative.json
+  report_json: datasets/reports/skyscenes_relative_summary.json
+  report_md: datasets/reports/skyscenes_relative_summary.md
+  description: >
+    SkyScenes H_15_P_0 / ClearNoon shards for Town01 (train + temporal validation
+    holdout) and Town02 (held-out test town). Depth is 8-bit normalised relative
+    depth; it is NOT metric depth and no metric error is reported from it.
+
+  sources:
+    - type: skyscenes
+      name: skyscenes
+      root: datasets/raw/skyscenes
+      altitudes: [H_15_P_0]
+      weathers: [ClearNoon]
+      towns: [Town01, Town02]
+      frames_per_shard: null
+      frame_stride: 1
+
+  supervision:
+    # relative | metric  (must match the dataset's depth maps)
+    depth_type: relative
+
+  splits:
+    # Split by flight/scene, never by random frame.
+    by_flight:
+      train: [Town01_H_15_P_0_ClearNoon]
+      test: [Town02_H_15_P_0_ClearNoon]
+    # Validation is the temporally last N frames of the training flight (in-domain
+    # early-stopping signal). The test town is never seen during training.
+    temporal_holdout:
+      Town01_H_15_P_0_ClearNoon:
+        val_tail: 14
+
+  image_size: 378          # multiple of 14 (ViT-S patch size)
+  train_batch_size: 2
+  eval_batch_size: 2
+  num_workers: 0
+  augment: true
+  rotate90: false
+  validate_values: true
+
+training:
+  epochs: 5
+  learning_rate: 0.00003
+  weight_decay: 0.0001
+  optimizer: adamw
+  scheduler: cosine
+  warmup_steps: 20
+  min_lr_ratio: 0.05
+  grad_accum_steps: 1
+  grad_clip_norm: 1.0
+  amp: auto                     # auto -> CUDA only; CPU stays fp32
+  early_stopping_patience: 3
+  early_stopping_metric: val_loss
+  log_every_n_steps: 5
+  limit_train_batches: null
+  limit_eval_batches: null
+  device: auto
+
+loss:
+  # Inverse-depth space. SILog is the primary term because the supervision is
+  # relative (unknown global scale). Gradient keeps roof/kerb discontinuities.
+  weights:
+    silog: 1.0
+    gradient: 0.5
+    l1: 0.0
+
+checkpoint:
+  dir: training/checkpoints/finetuned
+  keep_last_n: 1
+
+evaluation:
+  batch_size: 2
+  image_size: 378
+  max_visual_samples: 6
+  output_dir: training/experiments/exp_b_skyscenes_relative/eval
+  metrics:
+    - silog
+    - abs_rel
+    - rmse
+    - delta1
+  align: scale_shift
+  latency_warmup: 2
+  latency_runs: 5
+
+datasets_root: datasets

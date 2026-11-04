@@ -74,7 +74,10 @@ def override_get_db():
 
 app.dependency_overrides[get_db] = override_get_db
 
-# Create all tables once
+# Recreate the test schema from the current models. The test DB file persists between
+# runs, and ``create_all`` never adds columns to an existing table, so a stale file
+# would silently keep an old schema (e.g. depth_results without the provenance columns).
+Base.metadata.drop_all(bind=_engine)
 Base.metadata.create_all(bind=_engine)
 
 client = TestClient(app, raise_server_exceptions=True)
@@ -382,8 +385,11 @@ class TestDepthEstimation:
         data = resp.json()
         assert "depth_map_path" in data
         assert "colormap_path" in data
-        assert data.get("min_depth_m") is not None
-        assert data.get("max_depth_m") is not None
+        # Relative depth: metric fields are explicitly null, relative stats are present.
+        assert data.get("depth_type") == "relative"
+        assert data.get("min_depth_m") is None
+        assert data.get("max_depth_m") is None
+        assert data.get("relative_max") is not None
 
     def test_depth_artifact_exists_on_disk(self):
         token, project_id, image_id, _ = self._setup()
@@ -862,13 +868,32 @@ class TestJobOwnership:
 class TestModelGracefulFallback:
     """Depth service must work even without the real Depth Anything V2 checkpoint."""
 
-    def test_depth_works_without_dav2_checkpoint(self):
-        """The depth service falls back to the baseline CNN when the checkpoint is absent."""
+    def test_depth_service_exposes_verified_models_only(self):
+        """No silent CNN fallback: only verified Depth Anything V2 Small checkpoints."""
         from backend.app.services.depth_estimation import depth_service
-        # The service must be available (not None)
+
         assert depth_service is not None
-        # Check service has a model loaded
-        assert hasattr(depth_service, "model")
+        # The old toy CNN was removed; the service no longer holds a `model` attribute.
+        assert not hasattr(depth_service, "model")
+        models = depth_service.available_models()
+        assert set(models) == {"pretrained", "jatayuv_drone_v1"}
+        assert all(info["depth_type"] == "relative" for info in models.values())
+        # A missing checkpoint must raise a clear error rather than substitute a network.
+        from backend.app.services.depth_engine import DepthEngine, DepthModelError
+        import dataclasses
+        from backend.app.services import depth_engine as engine_module
+
+        spec = engine_module.MODEL_CATALOG["pretrained"]
+        missing = dataclasses.replace(spec, checkpoint=os.path.join(os.getcwd(), "nope", "missing.pth"))
+        engine_module.DepthEngine._cache.clear()
+        broken = DepthEngine.__new__(DepthEngine)
+        broken.model_id = "pretrained"
+        broken.spec = missing
+        broken.input_size = 98
+        import torch
+        broken.device = torch.device("cpu")
+        with pytest.raises(DepthModelError):
+            broken._load()
 
     def test_model_registry_available(self):
         from backend.app.services.model_registry import ModelRegistry

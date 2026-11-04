@@ -792,8 +792,10 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="font-mono text-xs">
-                    <span className="text-sky-400 font-bold">DEPTH ANYTHING V2:</span>
-                    <span className="text-muted-foreground ml-2">Relative-to-metric elevation estimation</span>
+                    <span className="text-sky-400 font-bold">DEPTH ANYTHING V2 SMALL:</span>
+                    <span className="text-muted-foreground ml-2">
+                      Relative inverse depth (no metric claim unless calibrated)
+                    </span>
                   </div>
                   <Button
                     onClick={() => triggerDepth("img-pre-01")}
@@ -813,6 +815,11 @@ export default function DashboardPage() {
                       minDepth={depthResult.min_depth_m}
                       maxDepth={depthResult.max_depth_m}
                       meanDepth={depthResult.mean_depth_m}
+                      relativeMin={depthResult.relative_min}
+                      relativeMax={depthResult.relative_max}
+                      relativeMean={depthResult.relative_mean}
+                      depthType={depthResult.depth_type}
+                      modelLabel={depthResult.model_label}
                     />
 
                     <div className="p-3 rounded bg-forest-900 border border-emerald-500/15 font-mono text-xs flex flex-wrap items-center justify-between gap-4">
@@ -1099,16 +1106,21 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
                   <span className="text-sm font-bold text-white flex items-center gap-2">
                     <Activity className="w-4 h-4 text-sky-400" />
-                    Depth Anything V2 (Metric)
+                    Depth Anything V2 Small (Relative)
                   </span>
-                  <Badge variant="tactical">ELEVATION CORE</Badge>
+                  <Badge variant="tactical">RELATIVE DEPTH</Badge>
                 </div>
                 <div className="space-y-1.5 text-muted-foreground text-[11px]">
-                  <div>BACKBONE: <span className="text-white">DINOv2 / ViT-L with Dense Relief Decoder</span></div>
-                  <div>PARAMETERS: <span className="text-white">335.3 Million</span></div>
+                  <div>BACKBONE: <span className="text-white">DINOv2 ViT-S/14 + DPT head</span></div>
+                  <div>PARAMETERS: <span className="text-white">24.79 Million (6.28 M trainable when fine-tuned)</span></div>
                   <div>INPUT TENSOR: <span className="text-white">3 x 518 x 518 (RGB float32)</span></div>
-                  <div>INFERENCE LATENCY: <span className="text-emerald-300 font-bold">14.8 ms (CUDA 12)</span></div>
-                  <div>ACCURACY: <span className="text-emerald-300">0.052 AbsRel / 0.982 Delta &lt; 1.25</span></div>
+                  <div>OUTPUT: <span className="text-white">relative inverse depth (unitless)</span></div>
+                  <div>LATENCY: <span className="text-emerald-300 font-bold">~185 ms/image on CPU (378 px, measured)</span></div>
+                  <div>
+                    ACCURACY: <span className="text-amber-300">
+                      no metric claim; aligned relative AbsRel 0.071 on the held-out SkyScenes test town
+                    </span>
+                  </div>
                 </div>
               </div>
 

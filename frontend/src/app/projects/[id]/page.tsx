@@ -226,8 +226,10 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
           <div className="glass-panel p-6 rounded-xl border border-emerald-500/25 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-white">Depth Anything V2 Monocular Relief</h3>
-                <p className="text-muted-foreground text-xs">Metric surface elevation map and relief extraction.</p>
+                <h3 className="text-base font-bold text-white">Depth Anything V2 Small — Monocular Depth</h3>
+                <p className="text-muted-foreground text-xs">
+                  Relative inverse-depth map and relief extraction (no metric scale unless calibrated).
+                </p>
               </div>
               <Button
                 onClick={() => handleRunInference("Depth")}
@@ -242,9 +244,11 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
             <DepthViewer
               originalImage="https://images.unsplash.com/photo-1508873696983-2df5293cb32f?auto=format&fit=crop&w=1200&q=80"
               depthMapUrl="https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=1200&q=80"
-              minDepth={3.4}
-              maxDepth={118.6}
-              meanDepth={47.2}
+              relativeMin={0.02}
+              relativeMax={0.97}
+              relativeMean={0.41}
+              depthType="relative"
+              modelLabel="Depth Anything V2 Small"
             />
           </div>
         )}

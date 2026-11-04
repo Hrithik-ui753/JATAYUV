@@ -66,9 +66,20 @@ def test_full_ai_inference_pipeline_and_photogrammetry():
     depth_data = depth_resp.json()
     assert os.path.exists(depth_data["depth_map_path"])
     assert os.path.exists(depth_data["colormap_path"])
-    assert depth_data["min_depth_m"] > 0
-    assert depth_data["max_depth_m"] >= depth_data["min_depth_m"]
-    assert depth_data["mean_depth_m"] > 0
+    # Depth Anything V2 Small predicts RELATIVE inverse depth. The API must not
+    # present it as metres: metric fields are null and the relative range is given
+    # in normalised inverse-depth units instead.
+    assert depth_data["depth_type"] == "relative"
+    assert depth_data["depth_unit"] == "relative_inverse_depth"
+    assert depth_data["is_metric"] is False
+    assert depth_data["min_depth_m"] is None
+    assert depth_data["max_depth_m"] is None
+    assert depth_data["mean_depth_m"] is None
+    assert 0.0 <= depth_data["relative_min"] <= depth_data["relative_max"] <= 1.0
+    assert 0.0 < depth_data["relative_mean"] <= 1.0
+    assert depth_data["model_id"] in {"pretrained", "jatayuv_drone_v1"}
+    assert len(depth_data["checkpoint_sha256"]) == 64
+    assert depth_data["inference_ms"] > 0
 
     # 4. Semantic Segmentation
     seg_resp = client.post("/api/v1/analysis/segmentation", json={"image_id": pre_id})

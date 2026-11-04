@@ -12,10 +12,27 @@ class DepthResult(Base):
     image_id = Column(String(36), ForeignKey("images.id"), nullable=False)
     depth_map_path = Column(String(512), nullable=False)
     colormap_path = Column(String(512), nullable=False)
+    # Legacy metric columns. They are only meaningful when depth_type == "metric_calibrated";
+    # for relative depth they hold 0.0 as an internal placeholder and the API reports None.
     min_depth_m = Column(Float, nullable=False)
     max_depth_m = Column(Float, nullable=False)
     mean_depth_m = Column(Float, nullable=False)
     mesh_obj_path = Column(String(512), nullable=True)
+
+    # Depth provenance / honesty metadata (added for the Depth Anything V2 pipeline).
+    depth_type = Column(String(32), nullable=True)          # relative | metric_calibrated
+    depth_unit = Column(String(64), nullable=True)          # relative_inverse_depth | metre
+    model_id = Column(String(100), nullable=True)
+    model_label = Column(String(200), nullable=True)
+    model_version = Column(String(100), nullable=True)
+    checkpoint_path = Column(String(512), nullable=True)
+    checkpoint_sha256 = Column(String(64), nullable=True)
+    input_size = Column(Integer, nullable=True)
+    inference_ms = Column(Float, nullable=True)
+    relative_min = Column(Float, nullable=True)
+    relative_max = Column(Float, nullable=True)
+    relative_mean = Column(Float, nullable=True)
+    raw_depth_path = Column(String(512), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     image = relationship("Image", back_populates="depth_results")

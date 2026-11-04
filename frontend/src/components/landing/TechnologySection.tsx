@@ -20,8 +20,8 @@ export function TechnologySection() {
       name: "Depth Anything V2",
       category: "Monocular Depth Model",
       icon: Cpu,
-      desc: "Zero-shot relative-to-metric elevation recovery, generating continuous depth gradient fields and 3D relief OBJ meshes from standard RGB UAV frames.",
-      specs: "ViT-Large backbone, 335M parameters, sub-meter accuracy",
+      desc: "Monocular relative depth from standard RGB UAV frames, generating continuous depth gradient fields and optional relief OBJ meshes. Relative only unless a metric calibration is fitted.",
+      specs: "DINOv2 ViT-S/14, 24.79M parameters, fine-tunable on aerial depth",
       badge: "NEURAL ELEVATION"
     },
     {

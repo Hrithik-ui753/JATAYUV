@@ -1,0 +1,89 @@
+# Experiment D — combined real (relative) + photogrammetry supervision.
+#
+# Status: NOT EXECUTED. Requires both the SkyScenes shards (available) *and* a COLMAP
+# reconstruction of JATAYUV flight data (blocked: COLMAP binary + own flights absent).
+#
+# Mixing rule enforced here: every source states its own depth type/unit. The combined
+# dataset keeps relative and metric samples distinguishable through `depth.type`, and
+# the loss weights are shared, so a mixed run must be validated per-source as well as
+# overall (see evaluation per_condition breakdown).
+
+experiment:
+  name: exp_d_combined
+  seed: 42
+  output_dir: training/experiments/exp_d_combined
+  description: SkyScenes relative depth + COLMAP photogrammetry pseudo-depth.
+
+model:
+  name: depth_anything_v2_small
+  encoder: vits
+  features: 64
+  out_channels: [48, 96, 192, 384]
+  pretrained_checkpoint: training/checkpoints/pretrained/depth_anything_v2_vits.pth
+  expected_sha256: 715fade13be8f229f8a70cc02066f656f2423a59effd0579197bbf57860e1378
+  expected_params: 24785089
+  finetune:
+    freeze: last_n_blocks
+    unfreeze_last_n_blocks: 2
+    backbone_lr_scale: 0.1
+
+data:
+  manifest_name: combined_depth
+  manifest: datasets/manifests/combined_depth.json
+  sources:
+    - type: skyscenes
+      name: skyscenes
+      root: datasets/raw/skyscenes
+      altitudes: [H_15_P_0]
+      weathers: [ClearNoon]
+      towns: [Town01]
+      frame_stride: 1
+    - type: paired
+      name: colmap
+      root: datasets/processed/colmap_dataset
+      depth_encoding: npy_float32
+      depth_type: relative
+      depth_unit: arbitrary_scale
+      label_method: photogrammetry_colmap
+      license: JATAYUV internal flight data
+  supervision:
+    depth_type: relative
+  splits:
+    by_flight:
+      train: [Town01_H_15_P_0_ClearNoon, colmap_flight_01]
+      test: [Town02_H_15_P_0_ClearNoon, colmap_flight_02]
+    temporal_holdout:
+      Town01_H_15_P_0_ClearNoon:
+        val_tail: 14
+  image_size: 378
+  train_batch_size: 2
+  eval_batch_size: 2
+  num_workers: 0
+  augment: true
+
+training:
+  epochs: 5
+  learning_rate: 0.00003
+  weight_decay: 0.0001
+  scheduler: cosine
+  warmup_steps: 20
+  grad_accum_steps: 1
+  amp: auto
+  early_stopping_patience: 3
+  device: auto
+
+loss:
+  weights:
+    silog: 1.0
+    l1: 0.5
+    gradient: 0.3
+
+checkpoint:
+  dir: training/checkpoints/finetuned
+  keep_last_n: 1
+
+evaluation:
+  batch_size: 2
+  image_size: 378
+  output_dir: training/experiments/exp_d_combined/eval
+  align: scale_shift

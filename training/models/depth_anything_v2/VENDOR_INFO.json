@@ -1,0 +1,30 @@
+{
+  "source_repository": "https://github.com/DepthAnything/Depth-Anything-V2",
+  "source_branch": "main",
+  "retrieved_utc": "2026-11-04",
+  "license": "Apache-2.0",
+  "license_file": "LICENSE_Apache-2.0",
+  "vendored_files": [
+    "dpt.py",
+    "dinov2.py",
+    "dinov2_layers/__init__.py",
+    "dinov2_layers/attention.py",
+    "dinov2_layers/block.py",
+    "dinov2_layers/drop_path.py",
+    "dinov2_layers/layer_scale.py",
+    "dinov2_layers/mlp.py",
+    "dinov2_layers/patch_embed.py",
+    "dinov2_layers/swiglu_ffn.py",
+    "util/blocks.py",
+    "util/transform.py"
+  ],
+  "modifications": "None. Only __init__.py (import shim) and this provenance file were added.",
+  "small_model_reference": {
+    "preset": "encoder='vits', features=64, out_channels=[48, 96, 192, 384]",
+    "parameters": 24785089,
+    "state_dict_tensors": 239,
+    "checkpoint_url": "https://huggingface.co/depth-anything/Depth-Anything-V2-Small/resolve/main/depth_anything_v2_vits.pth",
+    "checkpoint_sha256": "715fade13be8f229f8a70cc02066f656f2423a59effd0579197bbf57860e1378",
+    "checkpoint_bytes": 99218434
+  }
+}
