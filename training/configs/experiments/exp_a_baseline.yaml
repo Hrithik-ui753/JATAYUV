@@ -1,0 +1,73 @@
+# Experiment A — original pretrained Depth Anything V2 Small (no fine-tuning).
+#
+# This config exists so the baseline arm can be evaluated with exactly the same data,
+# resolution and alignment code as every other experiment:
+#
+#   python -m training.evaluation.evaluate_depth \
+#       --config training/configs/experiments/exp_a_baseline.yaml \
+#       --checkpoint training/checkpoints/pretrained/depth_anything_v2_vits.pth
+#
+# There is no training stage: A is the reference model.
+
+experiment:
+  name: exp_a_baseline
+  seed: 42
+  output_dir: training/experiments/exp_a_baseline
+  description: Official pretrained Depth Anything V2 Small, evaluated zero-shot.
+
+model:
+  name: depth_anything_v2_small
+  encoder: vits
+  features: 64
+  out_channels: [48, 96, 192, 384]
+  pretrained_checkpoint: training/checkpoints/pretrained/depth_anything_v2_vits.pth
+  expected_sha256: 715fade13be8f229f8a70cc02066f656f2423a59effd0579197bbf57860e1378
+  expected_params: 24785089
+  finetune:
+    freeze: none
+    unfreeze_last_n_blocks: 0
+    backbone_lr_scale: 0.1
+
+data:
+  manifest_name: skyscenes_relative
+  manifest: datasets/manifests/skyscenes_relative.json
+  sources:
+    - type: skyscenes
+      name: skyscenes
+      root: datasets/raw/skyscenes
+      altitudes: [H_15_P_0]
+      weathers: [ClearNoon]
+      towns: [Town01, Town02]
+      frame_stride: 1
+  supervision:
+    depth_type: relative
+  splits:
+    by_flight:
+      train: [Town01_H_15_P_0_ClearNoon]
+      test: [Town02_H_15_P_0_ClearNoon]
+    temporal_holdout:
+      Town01_H_15_P_0_ClearNoon:
+        val_tail: 14
+  image_size: 378
+  train_batch_size: 2
+  eval_batch_size: 2
+  num_workers: 0
+  augment: false
+
+training:
+  epochs: 0
+  learning_rate: 0.0
+  device: auto
+
+loss:
+  weights:
+    silog: 1.0
+
+evaluation:
+  batch_size: 2
+  image_size: 378
+  max_visual_samples: 6
+  output_dir: training/experiments/exp_a_baseline/eval
+  align: scale_shift
+  latency_warmup: 2
+  latency_runs: 5

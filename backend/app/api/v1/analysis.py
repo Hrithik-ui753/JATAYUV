@@ -17,6 +17,7 @@ from backend.app.models.user import User
 from backend.app.schemas.analysis import (
     DepthTriggerRequest,
     DepthResponse,
+    DepthModelInfo,
     SegmentationTriggerRequest,
     SegmentationResponse,
     DamageTriggerRequest,
@@ -25,6 +26,7 @@ from backend.app.schemas.analysis import (
     ChangeResponse,
 )
 from backend.app.services.depth_estimation import depth_service
+from backend.app.services.depth_engine import DepthModelError
 from backend.app.services.segmentation import segmentation_service
 from backend.app.services.damage_assessment import damage_service
 from backend.app.services.change_detection import change_service
@@ -33,6 +35,48 @@ from backend.app.api.deps import get_current_user, check_project_owner
 router = APIRouter(prefix="/analysis", tags=["AI Inference Services"])
 
 # --- 1. Monocular Depth Estimation ---
+def _depth_response(record: DepthResult) -> DepthResponse:
+    """Map an ORM row to the API model without faking metric depth.
+
+    The legacy ``*_depth_m`` columns are only meaningful for calibrated metric output.
+    For relative results they are reported as ``None`` so clients cannot read a
+    normalised relative field as metres.
+    """
+    is_metric = (record.depth_type or "relative") == "metric_calibrated"
+    return DepthResponse(
+        id=record.id,
+        job_id=record.job_id,
+        image_id=record.image_id,
+        depth_map_path=record.depth_map_path,
+        colormap_path=record.colormap_path,
+        min_depth_m=record.min_depth_m if is_metric else None,
+        max_depth_m=record.max_depth_m if is_metric else None,
+        mean_depth_m=record.mean_depth_m if is_metric else None,
+        mesh_obj_path=record.mesh_obj_path,
+        depth_type=record.depth_type or "relative",
+        depth_unit=record.depth_unit or "relative_inverse_depth",
+        is_metric=is_metric,
+        relative_min=record.relative_min,
+        relative_max=record.relative_max,
+        relative_mean=record.relative_mean,
+        model_id=record.model_id,
+        model_label=record.model_label,
+        model_version=record.model_version,
+        checkpoint_path=record.checkpoint_path,
+        checkpoint_sha256=record.checkpoint_sha256,
+        input_size=record.input_size,
+        inference_ms=record.inference_ms,
+        raw_depth_path=record.raw_depth_path,
+        created_at=record.created_at,
+    )
+
+
+@router.get("/depth/models", response_model=list[DepthModelInfo])
+def list_depth_models(current_user: User = Depends(get_current_user)):
+    """List the selectable depth checkpoints (pretrained vs JATAYUV fine-tuned)."""
+    return [DepthModelInfo(**info) for info in depth_service.available_models().values()]
+
+
 @router.post("/depth", response_model=DepthResponse)
 def trigger_depth_estimation(
     req: DepthTriggerRequest,
@@ -58,30 +102,60 @@ def trigger_depth_estimation(
     depth_path = os.path.join(settings.PROCESSED_DIR, f"depth_{image.id}.png")
     colormap_path = os.path.join(settings.PROCESSED_DIR, f"colormap_{image.id}.png")
     mesh_path = os.path.join(settings.PROCESSED_DIR, f"mesh_{image.id}.obj")
+    raw_path = os.path.join(settings.PROCESSED_DIR, f"depth_{image.id}.npy")
 
-    res = depth_service.estimate_depth(
-        input_image_path=image.file_path,
-        output_depth_path=depth_path,
-        output_colormap_path=colormap_path,
-        output_mesh_path=mesh_path,
-    )
+    try:
+        res = depth_service.estimate_depth(
+            input_image_path=image.file_path,
+            output_depth_path=depth_path,
+            output_colormap_path=colormap_path,
+            output_mesh_path=mesh_path,
+            model_id=req.model_id,
+            input_size=req.input_size,
+            output_raw_path=raw_path,
+        )
+    except DepthModelError as exc:
+        job.status = "failed"
+        job.error_message = str(exc)
+        db.commit()
+        raise HTTPException(status_code=503, detail=str(exc))
+    except Exception as exc:
+        job.status = "failed"
+        job.error_message = f"Depth inference failed: {exc}"
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Depth inference failed: {exc}")
 
     depth_record = DepthResult(
         job_id=job.id,
         image_id=image.id,
         depth_map_path=res["depth_map_path"],
         colormap_path=res["colormap_path"],
-        min_depth_m=res["min_depth_m"],
-        max_depth_m=res["max_depth_m"],
-        mean_depth_m=res["mean_depth_m"],
+        # Legacy NOT NULL columns: 0.0 placeholder unless genuinely metric.
+        min_depth_m=res["min_depth_m"] if res["min_depth_m"] is not None else 0.0,
+        max_depth_m=res["max_depth_m"] if res["max_depth_m"] is not None else 0.0,
+        mean_depth_m=res["mean_depth_m"] if res["mean_depth_m"] is not None else 0.0,
         mesh_obj_path=res["mesh_obj_path"],
+        depth_type=res["depth_type"],
+        depth_unit=res["depth_unit"],
+        model_id=res["model_id"],
+        model_label=res["model_label"],
+        model_version=res["model_version"],
+        checkpoint_path=res["checkpoint_path"],
+        checkpoint_sha256=res["checkpoint_sha256"],
+        input_size=res["input_size"],
+        inference_ms=res["inference_ms"],
+        relative_min=res["relative_min"],
+        relative_max=res["relative_max"],
+        relative_mean=res["relative_mean"],
+        raw_depth_path=res["raw_depth_path"],
     )
     db.add(depth_record)
     job.status = "completed"
     job.progress_pct = 100
     db.commit()
     db.refresh(depth_record)
-    return depth_record
+    return _depth_response(depth_record)
+
 
 @router.get("/depth/{image_id}", response_model=DepthResponse)
 def get_depth_result(
@@ -92,7 +166,7 @@ def get_depth_result(
     record = db.query(DepthResult).filter(DepthResult.image_id == image_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Depth inference result not found")
-    return record
+    return _depth_response(record)
 
 
 # --- 2. Semantic Segmentation ---

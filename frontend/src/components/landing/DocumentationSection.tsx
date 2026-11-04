@@ -43,7 +43,9 @@ res = requests.post(
     headers=headers
 )
 depth_data = res.json()
-print("Min Depth:", depth_data["min_depth_m"], "Max:", depth_data["max_depth_m"])`;
+print("Depth type:", depth_data["depth_type"], "model:", depth_data["model_label"])
+print("Relative range:", depth_data["relative_min"], "-", depth_data["relative_max"])
+# min_depth_m is null for relative output: Depth Anything V2 Small has no metric scale.`;
 
   return (
     <section id="documentation" className="py-20 bg-forest-950/90 border-b border-emerald-500/20 relative">

@@ -8,22 +8,46 @@ import { Button } from "@/components/ui/Button";
 interface DepthViewerProps {
   originalImage: string;
   depthMapUrl: string;
-  minDepth?: number;
-  maxDepth?: number;
-  meanDepth?: number;
+  /** Metric values are only present when the backend fitted a calibration. */
+  minDepth?: number | null;
+  maxDepth?: number | null;
+  meanDepth?: number | null;
+  relativeMin?: number | null;
+  relativeMax?: number | null;
+  relativeMean?: number | null;
+  depthType?: "relative" | "metric_calibrated";
+  modelLabel?: string;
   className?: string;
 }
 
 export function DepthViewer({
   originalImage,
   depthMapUrl,
-  minDepth = 2.4,
-  maxDepth = 85.6,
-  meanDepth = 34.2,
+  minDepth,
+  maxDepth,
+  meanDepth,
+  relativeMin,
+  relativeMax,
+  relativeMean,
+  depthType = "relative",
+  modelLabel,
   className,
 }: DepthViewerProps) {
   const [viewMode, setViewMode] = useState<"side-by-side" | "depth" | "blend">("blend");
   const [blendOpacity, setBlendOpacity] = useState(65);
+
+  // Depth Anything V2 Small is relative-only unless a metric calibration was fitted by
+  // the training pipeline. Never present normalised relative values as metres.
+  const isMetric = depthType === "metric_calibrated";
+  const low = isMetric ? minDepth : relativeMin;
+  const high = isMetric ? maxDepth : relativeMax;
+  const mid = isMetric ? meanDepth : relativeMean;
+  const fmt = (value?: number | null) =>
+    value === null || value === undefined
+      ? "n/a"
+      : isMetric
+        ? `${value.toFixed(1)} m`
+        : value.toFixed(3);
 
   return (
     <div className={cn("flex flex-col gap-3 rounded-lg border border-emerald-500/25 bg-forest-900/60 p-4 font-mono text-xs", className)}>
@@ -80,7 +104,7 @@ export function DepthViewer({
           <div className="relative overflow-hidden rounded border border-emerald-500/20 bg-forest-950">
             <img src={depthMapUrl} alt="Estimated Depth Map" className="w-full h-full object-cover" />
             <span className="absolute bottom-2 left-2 px-2 py-0.5 text-[11px] bg-forest-950/80 rounded text-emerald-300 border border-emerald-500/30">
-              Monocular Depth (Depth Anything V2)
+              {modelLabel || "Depth Anything V2 Small"} · {isMetric ? "metric (calibrated)" : "relative depth"}
             </span>
           </div>
         </div>
@@ -105,11 +129,13 @@ export function DepthViewer({
 
           {/* Colormap Elevation Legend */}
           <div className="absolute bottom-3 right-3 flex flex-col gap-1 p-2 bg-forest-950/90 backdrop-blur rounded border border-emerald-500/30 text-[11px] text-white">
-            <div className="text-[10px] uppercase font-bold text-muted-foreground">Relative Elevation Profile</div>
+            <div className="text-[10px] uppercase font-bold text-muted-foreground">
+              {isMetric ? "Depth (metres)" : "Relative inverse depth"}
+            </div>
             <div className="h-2.5 w-36 rounded bg-gradient-to-r from-blue-700 via-emerald-400 to-amber-300" />
             <div className="flex justify-between text-[9px] text-muted-foreground">
-              <span>Low ({minDepth.toFixed(1)}m)</span>
-              <span>High ({maxDepth.toFixed(1)}m)</span>
+              <span>Far ({fmt(low)})</span>
+              <span>Near ({fmt(high)})</span>
             </div>
           </div>
         </div>
@@ -118,17 +144,22 @@ export function DepthViewer({
       {/* Depth Statistics Bar */}
       <div className="grid grid-cols-3 gap-2 pt-1 text-center text-xs">
         <div className="p-2.5 rounded bg-forest-900 border border-emerald-500/20">
-          <div className="text-muted-foreground text-[10px]">MIN ESTIMATED ELEVATION</div>
-          <div className="text-sm font-semibold text-emerald-400 mt-0.5">{minDepth.toFixed(2)} m</div>
+          <div className="text-muted-foreground text-[10px]">MIN {isMetric ? "DEPTH" : "RELATIVE DEPTH"}</div>
+          <div className="text-sm font-semibold text-emerald-400 mt-0.5">{fmt(low)}</div>
         </div>
         <div className="p-2.5 rounded bg-forest-900 border border-emerald-500/20">
-          <div className="text-muted-foreground text-[10px]">MEAN GROUND ELEVATION</div>
-          <div className="text-sm font-semibold text-white mt-0.5">{meanDepth.toFixed(2)} m</div>
+          <div className="text-muted-foreground text-[10px]">MEAN {isMetric ? "DEPTH" : "RELATIVE DEPTH"}</div>
+          <div className="text-sm font-semibold text-white mt-0.5">{fmt(mid)}</div>
         </div>
         <div className="p-2.5 rounded bg-forest-900 border border-emerald-500/20">
-          <div className="text-muted-foreground text-[10px]">MAX CREST ELEVATION</div>
-          <div className="text-sm font-semibold text-sky-400 mt-0.5">{maxDepth.toFixed(2)} m</div>
+          <div className="text-muted-foreground text-[10px]">MAX {isMetric ? "DEPTH" : "RELATIVE DEPTH"}</div>
+          <div className="text-sm font-semibold text-sky-400 mt-0.5">{fmt(high)}</div>
         </div>
+      </div>
+      <div className="text-[10px] text-muted-foreground text-center">
+        {isMetric
+          ? "Metres, from a calibration fitted on metric ground truth."
+          : "Normalised inverse depth (0 = far, 1 = near). No metric scale is implied."}
       </div>
     </div>
   );

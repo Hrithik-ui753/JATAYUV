@@ -72,16 +72,35 @@ export interface AnalysisJob {
   updated_at: string;
 }
 
+/**
+ * Depth Anything V2 Small outputs RELATIVE inverse depth. The `*_depth_m` fields are
+ * null unless the backend used a checkpoint with a fitted metric calibration
+ * (`depth_type === "metric_calibrated"`). Never render relative values as metres.
+ */
 export interface DepthResult {
   id: string;
   job_id: string;
   image_id: string;
   depth_map_path: string;
   colormap_path: string;
-  min_depth_m: number;
-  max_depth_m: number;
-  mean_depth_m: number;
+  min_depth_m: number | null;
+  max_depth_m: number | null;
+  mean_depth_m: number | null;
   mesh_obj_path?: string;
+  depth_type: "relative" | "metric_calibrated";
+  depth_unit: string;
+  is_metric: boolean;
+  relative_min?: number | null;
+  relative_max?: number | null;
+  relative_mean?: number | null;
+  model_id?: string;
+  model_label?: string;
+  model_version?: string;
+  checkpoint_path?: string;
+  checkpoint_sha256?: string;
+  input_size?: number;
+  inference_ms?: number;
+  raw_depth_path?: string;
   created_at: string;
 }
 

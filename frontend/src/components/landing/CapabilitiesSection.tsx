@@ -241,15 +241,17 @@ export function CapabilitiesSection() {
                     <Activity className="w-4 h-4 text-sky-400" />
                     DEPTH ANYTHING V2 — ZERO-SHOT INFERENCE
                   </span>
-                  <span>HOVER TO INSPECT ELEVATION PIXELS</span>
+                  <span>HOVER TO INSPECT RELATIVE DEPTH PIXELS</span>
                 </div>
 
                 <DepthViewer
                   originalImage="https://images.unsplash.com/photo-1508873696983-2df5293cb32f?auto=format&fit=crop&w=1200&q=80"
                   depthMapUrl="https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=1200&q=80"
-                  minDepth={3.4}
-                  maxDepth={118.6}
-                  meanDepth={47.2}
+                  relativeMin={0.02}
+                  relativeMax={0.97}
+                  relativeMean={0.41}
+                  depthType="relative"
+                  modelLabel="Depth Anything V2 Small"
                 />
               </div>
 

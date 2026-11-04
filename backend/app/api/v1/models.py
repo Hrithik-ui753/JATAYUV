@@ -68,12 +68,30 @@ def _seed_default_models(db: Session) -> None:
     """Insert default AI model catalog entries if table is empty."""
     default_models = [
         AIModelVersion(
-            model_name="depth_anything_v2",
-            display_name="Depth Anything V2 — Large",
-            version="2.0.0",
+            model_name="depth_anything_v2_small",
+            display_name="Depth Anything V2 — Small (official pretrained)",
+            version="vits-official",
             task_type="depth_estimation",
-            description="Monocular depth estimation from single RGB aerial images using a vision transformer backbone. Trained on a combination of labeled and unlabeled data for robust generalisation.",
-            accuracy_metrics={"AbsRel": 0.043, "delta1": 0.981, "SILog": 0.058},
+            description=(
+                "Official Depth Anything V2 Small (ViT-S, 24.79M parameters) zero-shot "
+                "monocular relative inverse depth. No accuracy metrics are published here "
+                "because the model has not been benchmarked on JATAYUV drone data; run "
+                "training/evaluation/evaluate_depth.py for measured numbers."
+            ),
+            accuracy_metrics={},
+            is_active="1",
+        ),
+        AIModelVersion(
+            model_name="jatayuv_drone_depth_v1",
+            display_name="JATAYUV fine-tuned Depth Anything V2 Small",
+            version="jatayuv-drone-v1",
+            task_type="depth_estimation",
+            description=(
+                "Depth Anything V2 Small fine-tuned on aerial depth supervision by the "
+                "JATAYUV training pipeline. Relative inverse depth; metric output only "
+                "when a calibration has been fitted against metric ground truth."
+            ),
+            accuracy_metrics={},
             is_active="1",
         ),
         AIModelVersion(

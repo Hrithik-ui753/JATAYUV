@@ -1,0 +1,81 @@
+# Experiment E — optional teacher-generated pseudo-label training.
+#
+# Status: NOT EXECUTED (no JATAYUV flight data in the repository yet).
+#
+# This arm teaches the student to imitate the pretrained teacher on real drone frames.
+# It is useful for domain adaptation only. It CANNOT be used to claim real-depth
+# accuracy: the labels are teacher outputs, so the honest evaluation is against
+# independent real depth (or a held-out real-depth dataset), never against the teacher's
+# own labels on the same frames.
+#
+# Generate labels first:
+#   python -m training.preprocessing.media_ingest \
+#       --input <flight folder> --output datasets/manifests/own_flights.json
+#   python -m training.depth_generation.teacher_pseudo_depth \
+#       --input datasets/manifests/own_flights.json \
+#       --output datasets/manifests/own_flights_pseudo.json
+#   python -m training.preprocessing.prepare_dataset --config <this file>
+
+experiment:
+  name: exp_e_teacher_pseudo
+  seed: 42
+  output_dir: training/experiments/exp_e_teacher_pseudo
+  description: Student fine-tuned on pretrained-teacher pseudo-labels (domain adaptation).
+
+model:
+  name: depth_anything_v2_small
+  encoder: vits
+  features: 64
+  out_channels: [48, 96, 192, 384]
+  pretrained_checkpoint: training/checkpoints/pretrained/depth_anything_v2_vits.pth
+  expected_sha256: 715fade13be8f229f8a70cc02066f656f2423a59effd0579197bbf57860e1378
+  expected_params: 24785089
+  finetune:
+    freeze: last_n_blocks
+    unfreeze_last_n_blocks: 2
+    backbone_lr_scale: 0.1
+
+data:
+  manifest_name: own_flights_pseudo
+  manifest: datasets/manifests/own_flights_pseudo.json
+  sources:
+    - type: manifest
+      path: datasets/manifests/own_flights_pseudo.json
+  supervision:
+    depth_type: pseudo
+  splits:
+    # Replace with the real flight ids produced by media_ingest.
+    by_flight:
+      train: [flight_root]
+      test: [flight_holdout]
+  image_size: 378
+  train_batch_size: 2
+  eval_batch_size: 2
+  num_workers: 0
+  augment: true
+
+training:
+  epochs: 5
+  learning_rate: 0.00003
+  weight_decay: 0.0001
+  scheduler: cosine
+  warmup_steps: 20
+  grad_accum_steps: 1
+  amp: auto
+  early_stopping_patience: 3
+  device: auto
+
+loss:
+  weights:
+    silog: 1.0
+    gradient: 0.3
+
+checkpoint:
+  dir: training/checkpoints/finetuned
+  keep_last_n: 1
+
+evaluation:
+  batch_size: 2
+  image_size: 378
+  output_dir: training/experiments/exp_e_teacher_pseudo/eval
+  align: scale_shift

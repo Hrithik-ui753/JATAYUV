@@ -67,6 +67,14 @@ storage/*
 *.laz
 *.pcd
 
+# Depth training data and run artefacts (large, reproducible via training/)
+datasets/
+training/experiments/
+training/checkpoints/**/*.pth
+training/checkpoints/**/*.pt
+.test_ingest_*/
+backend/tests/test_module08_integration.db
+
 # Databases & Cache
 *.sqlite3
 *.db

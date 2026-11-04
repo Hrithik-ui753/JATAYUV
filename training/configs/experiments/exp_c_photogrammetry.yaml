@@ -1,0 +1,87 @@
+# Experiment C — fine-tuning on photogrammetry-generated pseudo-depth.
+#
+# Status: NOT EXECUTED. It requires COLMAP + a set of overlapping JATAYUV drone frames
+# (see docs/DEPTH_MODEL_TRAINING_PLAN.md, Phase 5B). COLMAP is not installed on the
+# reference workstation and no JATAYUV flight data is present in the repository, so
+# this configuration is provided ready-to-run but its data does not exist yet.
+#
+# Produce the labels first:
+#   python -m training.depth_generation.photogrammetry_colmap \
+#       --images datasets/processed/own_frames/<flight> \
+#       --workspace datasets/processed/colmap_workspace \
+#       --output-dir datasets/depth_maps/colmap
+#
+# SfM scale is arbitrary: these labels are relative depth, never metres.
+
+experiment:
+  name: exp_c_photogrammetry
+  seed: 42
+  output_dir: training/experiments/exp_c_photogrammetry
+  description: Fine-tune on COLMAP MVS depth (relative, arbitrary scale).
+
+model:
+  name: depth_anything_v2_small
+  encoder: vits
+  features: 64
+  out_channels: [48, 96, 192, 384]
+  pretrained_checkpoint: training/checkpoints/pretrained/depth_anything_v2_vits.pth
+  expected_sha256: 715fade13be8f229f8a70cc02066f656f2423a59effd0579197bbf57860e1378
+  expected_params: 24785089
+  finetune:
+    freeze: last_n_blocks
+    unfreeze_last_n_blocks: 2
+    backbone_lr_scale: 0.1
+
+data:
+  manifest_name: colmap_photogrammetry
+  manifest: datasets/manifests/colmap_photogrammetry.json
+  sources:
+    - type: paired
+      name: colmap
+      root: datasets/processed/colmap_dataset
+      images_subdir: images
+      depth_subdir: depth
+      depth_encoding: npy_float32
+      depth_type: relative
+      depth_unit: arbitrary_scale
+      value_scale: 1.0
+      label_method: photogrammetry_colmap
+      license: JATAYUV internal flight data
+  supervision:
+    depth_type: relative
+  splits:
+    by_flight:
+      train: [colmap_flight_01]
+      test: [colmap_flight_02]
+  image_size: 378
+  train_batch_size: 2
+  eval_batch_size: 2
+  num_workers: 0
+  augment: true
+
+training:
+  epochs: 5
+  learning_rate: 0.00003
+  weight_decay: 0.0001
+  scheduler: cosine
+  warmup_steps: 20
+  grad_accum_steps: 1
+  amp: auto
+  early_stopping_patience: 3
+  device: auto
+
+loss:
+  weights:
+    silog: 1.0
+    l1: 0.5
+    gradient: 0.3
+
+checkpoint:
+  dir: training/checkpoints/finetuned
+  keep_last_n: 1
+
+evaluation:
+  batch_size: 2
+  image_size: 378
+  output_dir: training/experiments/exp_c_photogrammetry/eval
+  align: scale_shift

@@ -21,7 +21,9 @@ from backend.app.services.training.models.change_levir import BiTemporalChangeDe
 from backend.app.services.training.trainer import AerialModelTrainer
 from backend.app.services.training.evaluate import evaluate_model_checkpoint
 from backend.app.services.training.export import verify_and_register_checkpoint
-from backend.app.services.depth_estimation import DepthEstimationModel, depth_service
+from backend.app.services.depth_estimation import depth_service
+from backend.app.services.depth_engine import DepthModelError
+from training.models.dav2_factory import build_dav2_small, load_checkpoint_strict
 from backend.app.services.photogrammetry import photogrammetry_service
 
 def setup_aerial_datasets():
@@ -240,9 +242,13 @@ def train_and_evaluate_all():
     print(f"LEVIR-CD F1: {change_eval['f1']:.4f} | IoU: {change_eval['iou']:.4f}")
 
     # -------------------------------------------------------------
-    # 4. Depth Anything V2 Small Monocular Depth Model
+    # 4. Depth Anything V2 Small — checkpoint verification (no accuracy claims)
     # -------------------------------------------------------------
-    print("\n--- [4/5] Evaluating & Registering Depth Anything V2 Small ---")
+    # Depth accuracy is only reported by the dedicated pipeline in ``training/``:
+    #   python -m training.evaluation.evaluate_depth --config ... --checkpoint ...
+    # This demo script therefore verifies the official checkpoint and records provenance;
+    # it does not invent metrics and does not re-save the weights under a new name.
+    print("\n--- [4/5] Verifying official Depth Anything V2 Small checkpoint ---")
     depth_out_dir = os.path.join(settings.STORAGE_DIR, "processed", "depth_eval")
     os.makedirs(depth_out_dir, exist_ok=True)
     sample_img = datasets["colmap_images"][0]
@@ -250,52 +256,53 @@ def train_and_evaluate_all():
     colormap_png = os.path.join(depth_out_dir, "sample_colormap.png")
     mesh_obj = os.path.join(depth_out_dir, "sample_terrain.obj")
 
-    depth_res = depth_service.estimate_depth(
-        input_image_path=sample_img,
-        output_depth_path=depth_png,
-        output_colormap_path=colormap_png,
-        altitude_m=120.0,
-        output_mesh_path=mesh_obj
+    official_ckpt = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+        "training", "checkpoints", "pretrained", "depth_anything_v2_vits.pth",
     )
-
-    depth_ckpt = os.path.join(checkpoints_base, "depth_anything_v2_small.pth")
-    torch.save({
-        "state_dict": depth_service.model.state_dict(),
-        "architecture": "DepthAnythingV2Small",
-        "metrics": {
-            "abs_rel": 0.048,
-            "rmse": 1.95,
-            "delta1": 0.974,
-            "min_depth_m": depth_res["min_depth_m"],
-            "max_depth_m": depth_res["max_depth_m"]
+    try:
+        verify_model = build_dav2_small()
+        load_report = load_checkpoint_strict(
+            verify_model, official_ckpt, verify_official_hash=True
+        )
+        depth_res = depth_service.estimate_depth(
+            input_image_path=sample_img,
+            output_depth_path=depth_png,
+            output_colormap_path=colormap_png,
+            output_mesh_path=mesh_obj,
+        )
+        ModelRegistry().register(
+            name="depth_anything_v2",
+            version="small",
+            architecture="DepthAnythingV2Small",
+            checkpoint_path=official_ckpt,
+            dataset="official pretrained (Dayton et al. 7M synthetic + 62M unlabeled)",
+            input_size=518,
+            hardware="cpu/cuda",
+            metrics={},  # no JATAYUV-domain evaluation has been run for this entry
+        )
+        reports["depth_v2_small"] = {
+            "model": "Depth Anything V2 Small (official)",
+            "checkpoint": official_ckpt,
+            "checkpoint_sha256": load_report.sha256,
+            "parameters": load_report.total_params,
+            "depth_type": depth_res["depth_type"],
+            "metrics": None,
+            "metrics_note": "not evaluated on JATAYUV drone data; see training/evaluation",
+            "output_colormap": colormap_png,
+            "output_mesh": mesh_obj,
         }
-    }, depth_ckpt)
-
-    registry = ModelRegistry()
-    registry.register(
-        name="depth_anything_v2",
-        version="small",
-        architecture="DepthAnythingV2Small",
-        checkpoint_path=depth_ckpt,
-        dataset="AerialDepthBenchmark",
-        input_size=512,
-        hardware="cpu/cuda",
-        metrics={
-            "abs_rel": 0.048,
-            "rmse": 1.95,
-            "delta1": 0.974
+        print(
+            f"Depth Anything V2 Small verified: {load_report.total_params:,} params, "
+            f"sha256={load_report.sha256[:12]}… (no accuracy claims made here)"
+        )
+    except (FileNotFoundError, ValueError, DepthModelError) as exc:
+        reports["depth_v2_small"] = {
+            "model": "Depth Anything V2 Small (official)",
+            "status": "unavailable",
+            "reason": str(exc),
         }
-    )
-    reports["depth_v2_small"] = {
-        "model": "Depth Anything V2 Small",
-        "abs_rel": 0.048,
-        "rmse": 1.95,
-        "delta1": 0.974,
-        "depth_range_m": f"{depth_res['min_depth_m']}m - {depth_res['max_depth_m']}m",
-        "output_colormap": colormap_png,
-        "output_mesh": mesh_obj
-    }
-    print(f"Depth V2 Small AbsRel: 0.048 | Depth Range: {depth_res['min_depth_m']}m to {depth_res['max_depth_m']}m")
+        print(f"Depth checkpoint verification skipped: {exc}")
 
     # -------------------------------------------------------------
     # 5. COLMAP 3D Photogrammetry Reconstruction

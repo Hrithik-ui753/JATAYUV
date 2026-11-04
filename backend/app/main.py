@@ -3,13 +3,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from backend.app.core.config import settings
-from backend.app.core.database import Base, engine
+from backend.app.core.database import Base, engine, ensure_depth_result_schema
 from backend.app.api.v1 import auth, projects, images, analysis, reconstruction, jobs, training
 from backend.app.api.v1 import models as models_router
 
 # Initialize Database Schema — creates tables for all registered models
 import backend.app.models  # noqa: F401 — ensures all models are imported before create_all
 Base.metadata.create_all(bind=engine)
+
+# Non-destructive column additions for databases created by earlier releases.
+ensure_depth_result_schema()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
