@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -75,3 +76,23 @@ def root():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
+=======
+from __future__ import annotations
+
+from fastapi import FastAPI
+
+from backend.app.api.v1.routers import (  # noqa: E402
+    frame_perception_router,
+    perception_router,
+    video_processing_router,
+)
+from backend.app.api.health import router as health_router
+
+app = FastAPI(
+    title="JATAYUV API",
+)
+app.include_router(health_router)
+app.include_router(video_processing_router)
+app.include_router(perception_router)
+app.include_router(frame_perception_router)
+>>>>>>> 0400f2f (p5-udpated)

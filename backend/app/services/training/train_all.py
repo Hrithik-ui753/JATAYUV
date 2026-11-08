@@ -24,7 +24,11 @@ from backend.app.services.training.export import verify_and_register_checkpoint
 from backend.app.services.depth_estimation import depth_service
 from backend.app.services.depth_engine import DepthModelError
 from training.models.dav2_factory import build_dav2_small, load_checkpoint_strict
+<<<<<<< HEAD
 from backend.app.services.photogrammetry import photogrammetry_service
+=======
+from backend.app.services.photogrammetry import ReconstructionError, photogrammetry_service
+>>>>>>> 0400f2f (p5-udpated)
 
 def setup_aerial_datasets():
     """Ensures real formatted aerial datasets are populated in storage/datasets."""
@@ -314,6 +318,7 @@ def train_and_evaluate_all():
     mesh_path = os.path.join(recon_dir, "mesh_surface.obj")
     dsm_path = os.path.join(recon_dir, "dsm_elevation.tif")
 
+<<<<<<< HEAD
     recon_res = photogrammetry_service.reconstruct_3d_pointcloud(
         image_paths=datasets["colmap_images"],
         output_ply_path=ply_path,
@@ -330,6 +335,41 @@ def train_and_evaluate_all():
         "dsm_path": dsm_path
     }
     print(f"COLMAP 3D Reconstructed {recon_res['num_points']} points from {recon_res['camera_count']} cameras (reprojection error: {recon_res['reprojection_error_px']} px)")
+=======
+    try:
+        recon_res = photogrammetry_service.reconstruct_3d_pointcloud(
+            image_paths=datasets["colmap_images"],
+            output_ply_path=ply_path,
+            output_mesh_path=mesh_path,
+            output_dsm_path=dsm_path,
+        )
+        reports["colmap_3d_reconstruction"] = {
+            "status": recon_res["status"],
+            "backend": recon_res["backend"],
+            "num_points": recon_res["num_points"],
+            "camera_count": recon_res["camera_count"],
+            "reprojection_error_px": recon_res["reprojection_error_px"],
+            "bounds": recon_res["bounds"],
+            "georeferenced": recon_res["georeferenced"],
+            "ply_path": recon_res["pointcloud_ply_path"],
+            "mesh_path": recon_res["mesh_obj_path"],
+            "dsm_path": recon_res["dsm_tiff_path"],
+            "dsm_unavailable_reason": recon_res["dsm_unavailable_reason"],
+        }
+        print(
+            f"COLMAP 3D reconstructed {recon_res['num_points']} points from "
+            f"{recon_res['camera_count']} cameras "
+            f"(reprojection error: {recon_res['reprojection_error_px']} px)"
+        )
+    except ReconstructionError as exc:
+        # Unavailable/failed reconstruction is reported as such; no geometry is faked.
+        reports["colmap_3d_reconstruction"] = {
+            "status": getattr(exc, "status", "failed"),
+            "reason": str(exc),
+            "details": getattr(exc, "details", {}),
+        }
+        print(f"COLMAP 3D reconstruction not produced ({getattr(exc, 'status', 'failed')}): {exc}")
+>>>>>>> 0400f2f (p5-udpated)
 
     # -------------------------------------------------------------
     # Save Consolidated Evaluation Report JSON

@@ -21,4 +21,8 @@ class Project(Base):
     images = relationship("Image", back_populates="project", cascade="all, delete-orphan")
     jobs = relationship("Job", back_populates="project", cascade="all, delete-orphan")
     reconstructions = relationship("Reconstruction3D", back_populates="project", cascade="all, delete-orphan")
+<<<<<<< HEAD
+=======
+    missions = relationship("Mission", back_populates="project", cascade="all, delete-orphan")
+>>>>>>> 0400f2f (p5-udpated)
 

@@ -37,6 +37,10 @@ import { Badge } from "@/components/ui/Badge";
 import { BeforeAfterSlider } from "@/components/viewer/BeforeAfterSlider";
 import { DepthViewer } from "@/components/viewer/DepthViewer";
 import { api } from "@/lib/api";
+<<<<<<< HEAD
+=======
+import { uploadOutcome } from "@/lib/integrity.mjs";
+>>>>>>> 0400f2f (p5-udpated)
 import { 
   Project, 
   AerialImage, 
@@ -90,11 +94,22 @@ export default function DashboardPage() {
   const [changeResult, setChangeResult] = useState<ChangeDetectionResult | null>(null);
   const [reconResult, setReconResult] = useState<Reconstruction3DResult | null>(null);
   const [activeInferencing, setActiveInferencing] = useState<string | null>(null);
+<<<<<<< HEAD
 
   // Upload state
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+=======
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+
+  // Upload state — a success message is only shown after the backend confirms stored frames.
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<
+    { kind: "success" | "error"; message: string } | null
+  >(null);
+>>>>>>> 0400f2f (p5-udpated)
 
   // Create Project Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -206,11 +221,16 @@ export default function DashboardPage() {
     }
   };
 
+<<<<<<< HEAD
   // Image Upload Handler
+=======
+  // Image Upload Handler — success is only reported when the backend confirms records.
+>>>>>>> 0400f2f (p5-udpated)
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (uploadFiles.length === 0) return;
     setUploading(true);
+<<<<<<< HEAD
     setUploadStatus("Ingesting UAV imagery and parsing EXIF headers...");
     try {
       const uploaded = await api.uploadImages(selectedProjectId, uploadFiles);
@@ -219,6 +239,23 @@ export default function DashboardPage() {
       setUploadFiles([]);
     } catch (err: any) {
       setUploadStatus("Upload completed with local simulation.");
+=======
+    setUploadStatus(null);
+    try {
+      const uploaded = await api.uploadImages(selectedProjectId, uploadFiles);
+      setImages([...uploaded, ...images]);
+      setUploadStatus(uploadOutcome({ ok: true, uploadedCount: uploaded.length }));
+      // Keep the selection only when the backend stored nothing (retry path).
+      if (uploaded.length > 0) setUploadFiles([]);
+    } catch (err: any) {
+      // The selection stays in place so the operator can retry the same upload.
+      setUploadStatus(
+        uploadOutcome({
+          ok: false,
+          errorMessage: err?.message ?? "No response from the backend",
+        })
+      );
+>>>>>>> 0400f2f (p5-udpated)
     } finally {
       setUploading(false);
     }
@@ -227,12 +264,21 @@ export default function DashboardPage() {
   // Trigger AI Depth
   const triggerDepth = async (imageId: string) => {
     setActiveInferencing("depth");
+<<<<<<< HEAD
+=======
+    setAnalysisError(null);
+>>>>>>> 0400f2f (p5-udpated)
     try {
       const res = await api.triggerDepthEstimation(imageId);
       setDepthResult(res);
       fetchData();
+<<<<<<< HEAD
     } catch (err) {
       console.error(err);
+=======
+    } catch (err: any) {
+      setAnalysisError(err?.message ?? "Depth estimation failed");
+>>>>>>> 0400f2f (p5-udpated)
     } finally {
       setActiveInferencing(null);
     }
@@ -241,12 +287,22 @@ export default function DashboardPage() {
   // Trigger AI Segmentation
   const triggerSegmentation = async (imageId: string) => {
     setActiveInferencing("segmentation");
+<<<<<<< HEAD
+=======
+    setAnalysisError(null);
+>>>>>>> 0400f2f (p5-udpated)
     try {
       const res = await api.triggerSegmentation(imageId);
       setSegmentationResult(res);
       fetchData();
+<<<<<<< HEAD
     } catch (err) {
       console.error(err);
+=======
+    } catch (err: any) {
+      setSegmentationResult(null);
+      setAnalysisError(err?.message ?? "Segmentation failed");
+>>>>>>> 0400f2f (p5-udpated)
     } finally {
       setActiveInferencing(null);
     }
@@ -255,12 +311,22 @@ export default function DashboardPage() {
   // Trigger Damage Assessment
   const triggerDamage = async (preId: string, postId: string) => {
     setActiveInferencing("damage");
+<<<<<<< HEAD
+=======
+    setAnalysisError(null);
+>>>>>>> 0400f2f (p5-udpated)
     try {
       const res = await api.triggerDamageAssessment(preId, postId);
       setDamageResult(res);
       fetchData();
+<<<<<<< HEAD
     } catch (err) {
       console.error(err);
+=======
+    } catch (err: any) {
+      setDamageResult(null);
+      setAnalysisError(err?.message ?? "Damage assessment failed");
+>>>>>>> 0400f2f (p5-udpated)
     } finally {
       setActiveInferencing(null);
     }
@@ -283,12 +349,23 @@ export default function DashboardPage() {
   // Trigger 3D Reconstruction
   const trigger3D = async () => {
     setActiveInferencing("3d");
+<<<<<<< HEAD
+=======
+    setAnalysisError(null);
+>>>>>>> 0400f2f (p5-udpated)
     try {
       const res = await api.trigger3DReconstruction(selectedProjectId);
       setReconResult(res);
       fetchData();
+<<<<<<< HEAD
     } catch (err) {
       console.error(err);
+=======
+    } catch (err: any) {
+      // Reconstruction unavailability/failure is surfaced; no geometry is displayed.
+      setReconResult(null);
+      setAnalysisError(err?.message ?? "3D reconstruction failed");
+>>>>>>> 0400f2f (p5-udpated)
     } finally {
       setActiveInferencing(null);
     }
@@ -393,7 +470,11 @@ export default function DashboardPage() {
                       {projects.length}
                     </h3>
                     <p className="text-[10px] font-mono text-emerald-400 mt-0.5">
+<<<<<<< HEAD
                       100% Calibrated
+=======
+                      Stored missions
+>>>>>>> 0400f2f (p5-udpated)
                     </p>
                   </div>
                   <div className="h-10 w-10 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
@@ -409,10 +490,17 @@ export default function DashboardPage() {
                       INGESTED DRONE FRAMES
                     </p>
                     <h3 className="text-2xl font-black text-white mt-1">
+<<<<<<< HEAD
                       {images.length > 0 ? images.length * 42 : 148}
                     </h3>
                     <p className="text-[10px] font-mono text-emerald-400 mt-0.5">
                       EXIF Geotagged
+=======
+                      {images.length}
+                    </h3>
+                    <p className="text-[10px] font-mono text-emerald-400 mt-0.5">
+                      Backend-confirmed uploads
+>>>>>>> 0400f2f (p5-udpated)
                     </p>
                   </div>
                   <div className="h-10 w-10 rounded bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center">
@@ -428,10 +516,17 @@ export default function DashboardPage() {
                       STRUCTURES ASSESSED (xBD)
                     </p>
                     <h3 className="text-2xl font-black text-rose-400 mt-1">
+<<<<<<< HEAD
                       {damageResult ? damageResult.total_buildings : 248}
                     </h3>
                     <p className="text-[10px] font-mono text-rose-300 mt-0.5">
                       4-Tier Classification
+=======
+                      {damageResult ? damageResult.total_buildings : "—"}
+                    </h3>
+                    <p className="text-[10px] font-mono text-rose-300 mt-0.5">
+                      {damageResult ? "4-Tier Classification" : "No verified assessment"}
+>>>>>>> 0400f2f (p5-udpated)
                     </p>
                   </div>
                   <div className="h-10 w-10 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center">
@@ -447,10 +542,17 @@ export default function DashboardPage() {
                       3D POINT CLOUD ASSETS
                     </p>
                     <h3 className="text-2xl font-black text-cyan-400 mt-1">
+<<<<<<< HEAD
                       {reconResult ? `${(reconResult.num_points / 1000).toFixed(0)}K pts` : "124K pts"}
                     </h3>
                     <p className="text-[10px] font-mono text-cyan-300 mt-0.5">
                       Dense Multi-View SfM
+=======
+                      {reconResult ? `${(reconResult.num_points / 1000).toFixed(0)}K pts` : "—"}
+                    </h3>
+                    <p className="text-[10px] font-mono text-cyan-300 mt-0.5">
+                      {reconResult ? "Verified COLMAP cloud" : "No verified reconstruction"}
+>>>>>>> 0400f2f (p5-udpated)
                     </p>
                   </div>
                   <div className="h-10 w-10 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center">
@@ -484,7 +586,11 @@ export default function DashboardPage() {
                 <AdvancedSpatialViewer3D
                   projectName={currentProject?.name}
                   locationName={currentProject?.location_name}
+<<<<<<< HEAD
                   initialPointCount={65000}
+=======
+                  plyUrl={reconResult?.pointcloud_ply_path}
+>>>>>>> 0400f2f (p5-udpated)
                 />
               </CardContent>
             </Card>
@@ -685,10 +791,41 @@ export default function DashboardPage() {
               )}
 
               {uploadStatus && (
+<<<<<<< HEAD
                 <div className="p-3 rounded bg-forest-900/90 border border-emerald-500/30 text-xs font-mono text-emerald-300">
                   {uploadStatus}
                 </div>
               )}
+=======
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className={`p-3 rounded text-xs font-mono flex items-start gap-2 ${
+                    uploadStatus.kind === "success"
+                      ? "bg-forest-900/90 border border-emerald-500/30 text-emerald-300"
+                      : "bg-rose-950/60 border border-rose-500/40 text-rose-300"
+                  }`}
+                >
+                  {uploadStatus.kind === "success" ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                  )}
+                  <span>{uploadStatus.message}</span>
+                </div>
+              )}
+
+              {uploadStatus?.kind === "error" && uploadFiles.length > 0 && (
+                <Button
+                  type="submit"
+                  variant="outline"
+                  size="sm"
+                  isLoading={uploading}
+                >
+                  <RefreshCw className="w-3.5 h-3.5 mr-1" /> Retry upload
+                </Button>
+              )}
+>>>>>>> 0400f2f (p5-udpated)
             </form>
 
             {/* Current Project Image Inventory */}
@@ -769,6 +906,16 @@ export default function DashboardPage() {
                 </p>
               </div>
 
+<<<<<<< HEAD
+=======
+              {analysisError && (
+                <div className="w-full p-3 rounded bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs font-mono flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{analysisError}</span>
+                </div>
+              )}
+
+>>>>>>> 0400f2f (p5-udpated)
               {/* Sub-tabs for Depth, Segmentation, Damage, Change */}
               <div className="flex items-center gap-1.5 glass-panel p-1 rounded font-mono text-xs">
                 {(["depth", "segmentation", "damage", "change"] as const).map((sub) => (
@@ -837,8 +984,15 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="font-mono text-xs">
+<<<<<<< HEAD
                     <span className="text-emerald-400 font-bold">SEGFORMER-B4:</span>
                     <span className="text-muted-foreground ml-2">8-class aerial land-cover categorization</span>
+=======
+                    <span className="text-emerald-400 font-bold">AERIAL LAND-COVER SEGMENTATION:</span>
+                    <span className="text-muted-foreground ml-2">
+                      7-class aerial land-cover categorisation (requires a verified checkpoint)
+                    </span>
+>>>>>>> 0400f2f (p5-udpated)
                   </div>
                   <Button
                     onClick={() => triggerSegmentation("img-pre-01")}
@@ -1010,10 +1164,24 @@ export default function DashboardPage() {
               </Button>
             </div>
 
+<<<<<<< HEAD
             <AdvancedSpatialViewer3D
               projectName={currentProject?.name}
               locationName={currentProject?.location_name}
               initialPointCount={85000}
+=======
+            {analysisError && (
+              <div className="p-3 rounded bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs font-mono flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{analysisError}</span>
+              </div>
+            )}
+
+            <AdvancedSpatialViewer3D
+              projectName={currentProject?.name}
+              locationName={currentProject?.location_name}
+              plyUrl={reconResult?.pointcloud_ply_path}
+>>>>>>> 0400f2f (p5-udpated)
             />
           </div>
         )}

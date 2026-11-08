@@ -1,4 +1,5 @@
 from datetime import datetime
+<<<<<<< HEAD
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 
@@ -22,3 +23,29 @@ class ReconstructionResponse(BaseModel):
     class Config:
         from_attributes = True
 
+=======
+from typing import Optional
+from pydantic import BaseModel, Field
+
+
+class ReconstructionResponse(BaseModel):
+    id: str
+    mission_id: str
+    reconstruction_version: str
+    reconstruction_method: str
+    status: str
+    point_cloud_path: Optional[str] = None
+    mesh_path: Optional[str] = None
+    texture_path: Optional[str] = None
+    coordinate_reference_system: Optional[str] = None
+    point_count: Optional[int] = None
+    vertex_count: Optional[int] = None
+    face_count: Optional[int] = None
+    coverage_ratio: Optional[float] = None
+    processing_duration_seconds: Optional[int] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+>>>>>>> 0400f2f (p5-udpated)

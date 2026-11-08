@@ -19,4 +19,8 @@ class User(Base):
 
     projects = relationship("Project", back_populates="owner", cascade="all, delete-orphan")
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+<<<<<<< HEAD
+=======
+    missions = relationship("Mission", back_populates="user", cascade="all, delete-orphan")
+>>>>>>> 0400f2f (p5-udpated)
 
