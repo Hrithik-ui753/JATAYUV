@@ -1,0 +1,13 @@
+{
+    "runtime": {
+        "python": "3.12",
+        "cuda": false
+    },
+    "env": {
+        "DB_ENGINE": "sqlite:///./storage/jatayuv.db"
+    },
+    "p6_note": "COLMAP and Open3D must be validated at runtime; relative depth is not metric.",
+    "created_by_p6": true,
+    "migration_head": "005_p6_reconstruction_tables",
+    "last_updated": "2026-11-08T00:00:00Z"
+}
