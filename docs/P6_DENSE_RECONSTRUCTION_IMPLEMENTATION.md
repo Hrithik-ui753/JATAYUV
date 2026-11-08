@@ -39,3 +39,4 @@ P6 only. No final 3D viewer or export dashboard (that is P7). No fabricated geom
 
 ## Documentation created
 - This file: docs/P6_DENSE_RECONSTRUCTION_IMPLEMENTATION.md
+- Runtime environment summary: `backend/app/core/runtime_env.json`

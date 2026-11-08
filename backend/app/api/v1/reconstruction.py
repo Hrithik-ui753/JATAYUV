@@ -1,7 +1,51 @@
+from __future__ import annotations
+
+
+
 import os
-import json
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+
+from datetime import datetime
+
+from typing import Any, Dict, List, Optional
+
+
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
+
+
+
+from backend.app.api.deps import CurrentUser, get_current_active_user
+
+from backend.app.models.mission import Mission
+
+from backend.app.models.reconstruction import Reconstruction
+
+from backend.app.models.processing import ProcessingRun
+
+from backend.app.api.v1.schemas.reconstruction import (
+
+    ReconstructionStartResponse,
+
+    ReconstructionStatusResponse,
+
+    ReconstructionListResponse,
+
+    ReconstructionDetailResponse,
+
+    ReconstructionArtifactResponse,
+
+    ReconstructionReportResponse,
+
+    ReconstructionCancelResponse,
+
+)
+
+from backend.app.services.recon.pipeline import ReconstructionPipeline
+
+from backend.app.services.recon.readiness import ReconstructionReadiness
+
+from backend.app.core.database import db
+
 from backend.app.core.config import settings
 from backend.app.core.database import get_db
 from backend.app.models.image import Image
@@ -9,10 +53,6 @@ from backend.app.models.project import Project
 from backend.app.models.job import Job
 from backend.app.models.reconstruction import Reconstruction3D
 from backend.app.models.user import User
-<<<<<<< HEAD
-from backend.app.schemas.reconstruction import ReconstructionTriggerRequest, ReconstructionResponse
-from backend.app.services.photogrammetry import photogrammetry_service
-=======
 from backend.app.schemas.reconstruction import ReconstructionResponse
 
 # Legacy placeholder: the original trigger request class was removed during the
@@ -25,13 +65,10 @@ from backend.app.services.photogrammetry import (
     ReconstructionUnavailable,
     photogrammetry_service,
 )
->>>>>>> 0400f2f (p5-udpated)
 from backend.app.api.deps import get_current_user, check_project_owner
 
 router = APIRouter(prefix="/reconstruction", tags=["3D Photogrammetry"])
 
-<<<<<<< HEAD
-=======
 
 def _reconstruction_detail(status_value: str, exc: Exception) -> dict:
     return {
@@ -64,7 +101,6 @@ def reconstruction_backend_status(current_user: User = Depends(get_current_user)
     return info
 
 
->>>>>>> 0400f2f (p5-udpated)
 @router.post("/3d", response_model=ReconstructionResponse)
 def trigger_3d_reconstruction(
     req: ReconstructionTriggerRequest,
@@ -78,35 +114,36 @@ def trigger_3d_reconstruction(
     else:
         images = db.query(Image).filter(Image.project_id == project.id).all()
 
-    if not images:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot run 3D reconstruction on project with no uploaded aerial images",
-        )
+    if not check["ready"]:
 
-    job = Job(
-        project_id=project.id,
-        job_type="reconstruction_3d",
-        status="processing",
-        progress_pct=15,
+        raise HTTPException(status_code=409, detail="Reconstruction inputs not ready")
+
+
+
+    run = ProcessingRun(
+
+        mission_id=mission_id,
+
+        job_type="3d_reconstruction",
+
+        status="pending",
+
+        started_at=None,
+
+        completed_at=None,
+
+        cancelled_at=None,
+
+        error_message=None,
+
     )
-    db.add(job)
+
+    db.add(run)
+
     db.commit()
     db.refresh(job)
 
     ply_path = os.path.join(settings.RECONSTRUCTION_DIR, f"pointcloud_{project.id}.ply")
-<<<<<<< HEAD
-    mesh_path = os.path.join(settings.RECONSTRUCTION_DIR, f"mesh_{project.id}.obj")
-    dsm_path = os.path.join(settings.RECONSTRUCTION_DIR, f"dsm_{project.id}.tif")
-
-    image_paths = [img.file_path for img in images]
-    res = photogrammetry_service.reconstruct_3d_pointcloud(
-        image_paths=image_paths,
-        output_ply_path=ply_path,
-        output_mesh_path=mesh_path,
-        output_dsm_path=dsm_path,
-    )
-=======
     mesh_path = os.path.join(settings.RECONSTRUCTION_DIR, f"mesh_{project.id}.ply")
     dsm_path = os.path.join(settings.RECONSTRUCTION_DIR, f"dsm_{project.id}.tif")
 
@@ -156,7 +193,6 @@ def trigger_3d_reconstruction(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"3D reconstruction failed: {exc}",
         ) from exc
->>>>>>> 0400f2f (p5-udpated)
 
     recon_record = (
         db.query(Reconstruction3D)
@@ -174,11 +210,7 @@ def trigger_3d_reconstruction(
             num_points=res["num_points"],
             camera_count=res["camera_count"],
             reprojection_error_px=res["reprojection_error_px"],
-<<<<<<< HEAD
-            bounds_json=json.dumps(res["bounds"]),
-=======
             bounds_json=json.dumps(res["bounds"]) if res["bounds"] else None,
->>>>>>> 0400f2f (p5-udpated)
         )
         db.add(recon_record)
     else:
@@ -189,11 +221,7 @@ def trigger_3d_reconstruction(
         recon_record.num_points = res["num_points"]
         recon_record.camera_count = res["camera_count"]
         recon_record.reprojection_error_px = res["reprojection_error_px"]
-<<<<<<< HEAD
-        recon_record.bounds_json = json.dumps(res["bounds"])
-=======
         recon_record.bounds_json = json.dumps(res["bounds"]) if res["bounds"] else None
->>>>>>> 0400f2f (p5-udpated)
 
     job.status = "completed"
     job.progress_pct = 100
@@ -211,11 +239,6 @@ def trigger_3d_reconstruction(
         camera_count=recon_record.camera_count,
         reprojection_error_px=recon_record.reprojection_error_px,
         bounds=res["bounds"],
-<<<<<<< HEAD
-        created_at=recon_record.created_at,
-    )
-
-=======
         backend=res.get("backend"),
         status=res.get("status", "completed"),
         georeferenced=res.get("georeferenced"),
@@ -225,7 +248,6 @@ def trigger_3d_reconstruction(
     )
 
 
->>>>>>> 0400f2f (p5-udpated)
 @router.get("/3d/{project_id}", response_model=ReconstructionResponse)
 def get_3d_reconstruction(
     project_id: str,
@@ -236,15 +258,6 @@ def get_3d_reconstruction(
     recon = db.query(Reconstruction3D).filter(Reconstruction3D.project_id == project_id).first()
     if not recon:
         raise HTTPException(status_code=404, detail="3D reconstruction result not found for this project")
-<<<<<<< HEAD
-    
-    bounds = None
-    if recon.bounds_json:
-        try:
-            bounds = json.loads(recon.bounds_json)
-        except Exception:
-            pass
-=======
 
     bounds = None
     if recon.bounds_json:
@@ -254,7 +267,6 @@ def get_3d_reconstruction(
                 bounds = parsed
         except Exception:
             bounds = None
->>>>>>> 0400f2f (p5-udpated)
 
     return ReconstructionResponse(
         id=recon.id,
@@ -267,12 +279,6 @@ def get_3d_reconstruction(
         camera_count=recon.camera_count,
         reprojection_error_px=recon.reprojection_error_px,
         bounds=bounds,
-<<<<<<< HEAD
-        created_at=recon.created_at,
-    )
-
-=======
         status="completed",
         created_at=recon.created_at,
     )
->>>>>>> 0400f2f (p5-udpated)
