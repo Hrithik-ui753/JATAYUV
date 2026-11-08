@@ -80,3 +80,29 @@ class JobRepository:
             return self.update_status(job, "cancelled")
         return job
 
+<<<<<<< HEAD
+=======
+    def transition_to_terminal(self, job: Job, status: str, error_message: str = None) -> Job:
+        """Move a job to a terminal state safely. Terminal jobs cannot transition back to running."""
+        terminal = {"completed", "failed", "cancelled"}
+        if job.status in terminal:
+            return job
+        return self.update_status(job, status, error_message=error_message)
+
+    def can_retry(self, job: Job, max_retries: int = 3) -> bool:
+        """A job is retryable if it is not terminal and has not exceeded its retry budget."""
+        if job.status in {"completed", "cancelled"}:
+            return False
+        if job.status == "failed" and job.retry_count >= max_retries:
+            return False
+        return True
+
+    def increment_retry(self, job: Job) -> Job:
+        job.retry_count = (job.retry_count or 0) + 1
+        job.status = "queued"
+        job.error_message = None
+        self.db.commit()
+        self.db.refresh(job)
+        return job
+
+>>>>>>> 0400f2f (p5-udpated)

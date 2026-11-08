@@ -153,6 +153,14 @@ export interface ChangeDetectionResult {
   created_at: string;
 }
 
+<<<<<<< HEAD
+=======
+/**
+ * Result of a real COLMAP reconstruction. `reprojection_error_px` is only present
+ * when COLMAP reported it; `bounds` is null when the cloud bounds were unavailable.
+ * COLMAP output is not georeferenced, so no DSM is produced.
+ */
+>>>>>>> 0400f2f (p5-udpated)
 export interface Reconstruction3DResult {
   id: string;
   job_id: string;
@@ -162,7 +170,11 @@ export interface Reconstruction3DResult {
   dsm_tiff_path?: string;
   num_points: number;
   camera_count: number;
+<<<<<<< HEAD
   reprojection_error_px: number;
+=======
+  reprojection_error_px: number | null;
+>>>>>>> 0400f2f (p5-udpated)
   bounds: {
     min_x: number;
     max_x: number;
@@ -170,7 +182,150 @@ export interface Reconstruction3DResult {
     max_y: number;
     min_z: number;
     max_z: number;
+<<<<<<< HEAD
   };
   created_at: string;
 }
 
+=======
+  } | null;
+  backend?: string | null;
+  status?: string | null;
+  georeferenced?: boolean | null;
+  mesh_unavailable_reason?: string | null;
+  dsm_unavailable_reason?: string | null;
+  created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Mission video processing (P2) types
+// ---------------------------------------------------------------------------
+
+export type VideoProcessingStage =
+  | "upload_validation"
+  | "metadata_extraction"
+  | "frame_extraction"
+  | "quality_analysis"
+  | "duplicate_detection"
+  | "frame_selection"
+  | "gps_association"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "queued"
+  | "processing"
+  | "no_processing"
+  | "pending"
+  ;
+
+export type FrameQualityStatus =
+  | "unreviewed"
+  | "accepted"
+  | "warning"
+  | "rejected"
+  | "low_quality"
+  ;
+
+export type FrameDuplicateStatus =
+  | "unique"
+  | "exact_duplicate"
+  | "near_duplicate"
+  ;
+
+export interface VideoMetadata {
+  container_format?: string | null;
+  duration_seconds?: number | null;
+  width?: number | null;
+  height?: number | null;
+  nominal_fps?: number | null;
+  avg_fps?: number | null;
+  codec_name?: string | null;
+  codec_long_name?: string | null;
+  pixel_format?: string | null;
+  stream_time_base?: string | null;
+  nb_frames?: number | null;
+  probe_duration_method?: string | null;
+  truncated_probe?: boolean | null;
+}
+
+export interface VideoProcessingStatus {
+  status: string;
+  stage?: string | null;
+  progress_pct?: number | null;
+  celery_task_id?: string | null;
+  processing_run_id?: string | null;
+  error_message?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  jobs?: Array<{
+    id: string;
+    status: string;
+    stage: string | null;
+    progress_pct: number;
+    created_at: string | null;
+  }> | null;
+}
+
+export interface ProcessingReport {
+  mission_id: string;
+  processing_run_id?: string | null;
+  job_id?: string | null;
+  job_status?: string | null;
+  job_stage?: string | null;
+  progress_pct?: number | null;
+  total_frames: number;
+  frames_accepted: number;
+  frames_warning: number;
+  frames_rejected: number;
+  frames_unreviewed: number;
+  duplicate_frames: number;
+  selected_frames: number;
+  gps_associated_frames: number;
+  gps_coverage_pct: number;
+  error_message?: string | null;
+  notes?: Array<string> | null;
+}
+
+export interface Frame {
+  id: string;
+  mission_id: string;
+  video_id: string;
+  frame_index: number;
+  presentation_timestamp?: number | null;
+  timestamp_seconds?: number | null;
+  // Internal storage path is omitted from the API response.
+  storage_path: null;
+  width?: number | null;
+  height?: number | null;
+  blur_score?: number | null;
+  exposure_score?: number | null;
+  duplicate_status: string;
+  quality_status: string;
+  gps_latitude?: number | null;
+  gps_longitude?: number | null;
+  altitude?: number | null;
+  altitude_datum?: string | null;
+  duplicate_hash?: string | null;
+  duplicate_of_frame_id?: string | null;
+  duplicate_distance?: number | null;
+  duplicate_reason?: string | null;
+  quality_details_json?: string | null;
+  is_selected?: boolean | null;
+  selection_reason?: string | null;
+  processing_run_id?: string | null;
+  gps_timestamp_seconds?: number | null;
+  gps_timestamp_str?: string | null;
+  gps_quality?: string | null;
+  gps_source?: string | null;
+  gps_association_gap_seconds?: number | null;
+  created_at: string;
+}
+
+export interface EnqueueProcessingResponse {
+  job_id: string;
+  celery_task_id?: string | null;
+  processing_run_id?: string | null;
+  status: string;
+}
+
+>>>>>>> 0400f2f (p5-udpated)

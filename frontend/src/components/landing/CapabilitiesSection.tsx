@@ -23,7 +23,10 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { BeforeAfterSlider } from "@/components/viewer/BeforeAfterSlider";
 import { DepthViewer } from "@/components/viewer/DepthViewer";
+<<<<<<< HEAD
 import { PointCloudViewer } from "@/components/viewer/PointCloudViewer";
+=======
+>>>>>>> 0400f2f (p5-udpated)
 
 export function CapabilitiesSection() {
   const [activeCapability, setActiveCapability] = useState<"depth" | "segmentation" | "damage" | "change" | "3d">("damage");
@@ -486,11 +489,31 @@ export function CapabilitiesSection() {
                     <Box className="w-4 h-4 text-cyan-400" />
                     3D DENSE POINT CLOUD RECONSTRUCTION
                   </span>
+<<<<<<< HEAD
                   <span>124,800 POINTS RENDERED</span>
                 </div>
 
                 <div className="h-[380px] w-full rounded-lg overflow-hidden border border-emerald-500/30">
                   <PointCloudViewer numPoints={45000} />
+=======
+                  <span>ILLUSTRATIVE PREVIEW</span>
+                </div>
+
+                {/* Decorative graphic only. The production viewer renders verified PLY
+                    artifacts and never substitutes procedural geometry. */}
+                <div
+                  aria-hidden="true"
+                  className="relative h-[380px] w-full rounded-lg overflow-hidden border border-emerald-500/30 bg-forest-950"
+                  style={{
+                    backgroundImage:
+                      "radial-gradient(circle at 30% 40%, rgba(16,185,129,0.35) 0, rgba(6,10,8,0) 45%), radial-gradient(circle at 70% 65%, rgba(56,189,248,0.28) 0, rgba(6,10,8,0) 40%)",
+                  }}
+                >
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center font-mono text-[11px] text-muted-foreground">
+                    <Box className="w-8 h-8 text-cyan-400/70" />
+                    <span>Hover a mission&apos;s 3D tab to load its verified point cloud</span>
+                  </div>
+>>>>>>> 0400f2f (p5-udpated)
                 </div>
               </div>
 
