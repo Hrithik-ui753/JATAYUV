@@ -22,16 +22,17 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
     try {
+      if (isRegister) {
+        await api.register({ email, password, full_name: fullName });
+      }
       const res = await api.loginJson({ email, password });
       if (res && res.access_token) {
         localStorage.setItem("jatayuv_token", res.access_token);
       }
       router.push("/dashboard");
     } catch (err: any) {
-      console.warn("Backend auth offline, using demo analyst session:", err.message);
-      // Fallback local session for seamless verification
-      localStorage.setItem("jatayuv_token", "demo-analyst-session-token");
-      router.push("/dashboard");
+      const msg = err?.message || (isRegister ? "Registration failed." : "Authentication failed. Invalid email or password.");
+      setError(msg);
     } finally {
       setIsLoading(false);
     }

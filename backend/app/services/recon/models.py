@@ -24,9 +24,9 @@ class ReconstructionRun(Base):
     __tablename__ = "reconstruction_runs"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    mission_id = Column(String(36), ForeignKey("missions.id", ondelete="CASCADE"), nullable=False, index=True)
+    mission_id = Column(String(36), ForeignKey("missions.id", ondelete="CASCADE"), nullable=False)
     georef_processing_run_id = Column(String(36), ForeignKey("georef_processing_runs.id", ondelete="SET NULL"), nullable=True, index=True)
-    processing_run_id = Column(String(36), ForeignKey("processing_runs.id", ondelete="SET NULL"), nullable=True, index=True)
+    processing_run_id = Column(String(36), ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True, index=True)
     reconstruction_version = Column(String(64), nullable=False)
     reconstruction_method = Column(String(128), nullable=False)
     status = Column(String(50), nullable=False)
@@ -51,7 +51,7 @@ class ReconstructionRun(Base):
 
     mission = relationship("Mission", backref="reconstruction_runs")
     georef_processing_run = relationship("GeorefProcessingRun", backref="reconstruction_runs")
-    processing_run = relationship("ProcessingRun", backref="reconstruction_runs")
+    job = relationship("Job", backref="reconstruction_runs")
     frames = relationship("ReconstructionFrame", backref="reconstruction_run", cascade="all, delete-orphan")
     point_cloud_artifacts = relationship("PointCloudArtifact", backref="reconstruction_run", cascade="all, delete-orphan")
     mesh_artifacts = relationship("MeshArtifact", backref="reconstruction_run", cascade="all, delete-orphan")
@@ -68,12 +68,12 @@ class ReconstructionFrame(Base):
     __tablename__ = "reconstruction_frames"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    reconstruction_run_id = Column(String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False, index=True)
-    frame_id = Column(String(36), ForeignKey("frames.id", ondelete="SET NULL"), nullable=False, index=True)
-    camera_pose_id = Column(String(36), ForeignKey("camera_poses.id", ondelete="SET NULL"), nullable=True, index=True)
-    depth_artifact_id = Column(String(36), ForeignKey("perception_artifacts.id", ondelete="SET NULL"), nullable=True, index=True)
-    segmentation_artifact_id = Column(String(36), ForeignKey("perception_artifacts.id", ondelete="SET NULL"), nullable=True, index=True)
-    dynamic_mask_artifact_id = Column(String(36), ForeignKey("perception_artifacts.id", ondelete="SET NULL"), nullable=True, index=True)
+    reconstruction_run_id = Column(String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False)
+    frame_id = Column(String(36), ForeignKey("frames.id", ondelete="SET NULL"), nullable=False)
+    camera_pose_id = Column(String(36), ForeignKey("camera_poses.id", ondelete="SET NULL"), nullable=True)
+    depth_artifact_id = Column(String(36), ForeignKey("perception_artifacts.id", ondelete="SET NULL"), nullable=True)
+    segmentation_artifact_id = Column(String(36), ForeignKey("perception_artifacts.id", ondelete="SET NULL"), nullable=True)
+    dynamic_mask_artifact_id = Column(String(36), ForeignKey("perception_artifacts.id", ondelete="SET NULL"), nullable=True)
     contribution_status = Column(String(64), nullable=True)
     notes_json = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
@@ -92,7 +92,7 @@ class PointCloudArtifact(Base):
     __tablename__ = "point_cloud_artifacts"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    reconstruction_run_id = Column(String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    reconstruction_run_id = Column(String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False)
     storage_path = Column(String(512), nullable=False)
     relative_path = Column(String(512), nullable=True)
     file_size_bytes = Column(Integer, nullable=True)
@@ -117,7 +117,7 @@ class MeshArtifact(Base):
     __tablename__ = "mesh_artifacts"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    reconstruction_run_id = Column(String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    reconstruction_run_id = Column(String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False)
     storage_path = Column(String(512), nullable=False)
     relative_path = Column(String(512), nullable=True)
     file_size_bytes = Column(Integer, nullable=True)
@@ -144,7 +144,7 @@ class TextureArtifact(Base):
     __tablename__ = "texture_artifacts"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    reconstruction_run_id = Column(String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    reconstruction_run_id = Column(String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False)
     storage_path = Column(String(512), nullable=False)
     relative_path = Column(String(512), nullable=True)
     file_size_bytes = Column(Integer, nullable=True)
@@ -165,7 +165,7 @@ class ReconstructionQualityReport(Base):
     __tablename__ = "reconstruction_quality_reports"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    reconstruction_run_id = Column(String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    reconstruction_run_id = Column(String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False)
     validated_point_count = Column(Integer, nullable=True)
     validated_registered_images = Column(Integer, nullable=True)
     validated_reprojection_error_px = Column(Float, nullable=True)

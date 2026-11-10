@@ -1,16 +1,3 @@
-<<<<<<< HEAD
-import os
-import io
-import pytest
-import numpy as np
-import cv2
-from PIL import Image as PILImage
-from fastapi.testclient import TestClient
-from backend.app.main import app
-
-client = TestClient(app)
-
-=======
 """Integration checks for the AI endpoints and 3D reconstruction (P0 integrity).
 
 The platform no longer fabricates model output or geometry, so this test asserts the
@@ -37,7 +24,6 @@ from backend.app.services import depth_engine
 client = TestClient(app)
 
 
->>>>>>> 0400f2f (p5-udpated)
 def create_aerial_image_pair():
     # Pre-disaster: Intact building
     img_pre = np.zeros((250, 250, 3), dtype=np.uint8)
@@ -61,9 +47,6 @@ def create_aerial_image_pair():
 
     return buf_pre, buf_post
 
-<<<<<<< HEAD
-def test_full_ai_inference_pipeline_and_photogrammetry():
-=======
 
 def _unavailable_resp(response):
     assert response.status_code == 503, response.text
@@ -73,18 +56,12 @@ def _unavailable_resp(response):
 
 
 def test_ai_endpoints_fail_explicitly_and_change_detection_still_works(tmp_path, monkeypatch):
->>>>>>> 0400f2f (p5-udpated)
     # 1. Setup project
     proj_resp = client.post(
         "/api/v1/projects",
         json={
-<<<<<<< HEAD
-            "name": "Disaster Response AI Evaluation",
-            "description": "Validation test for depth, segmentation, damage and 3D",
-=======
             "name": "P0 Integrity Evaluation",
             "description": "Validates honest unavailability of AI services",
->>>>>>> 0400f2f (p5-udpated)
             "location_name": "Disaster Sector A-1",
         },
     )
@@ -106,39 +83,6 @@ def test_ai_endpoints_fail_explicitly_and_change_detection_still_works(tmp_path,
     pre_id = images[0]["id"]
     post_id = images[1]["id"]
 
-<<<<<<< HEAD
-    # 3. Monocular Depth Estimation
-    depth_resp = client.post("/api/v1/analysis/depth", json={"image_id": pre_id})
-    assert depth_resp.status_code == 200
-    depth_data = depth_resp.json()
-    assert os.path.exists(depth_data["depth_map_path"])
-    assert os.path.exists(depth_data["colormap_path"])
-    # Depth Anything V2 Small predicts RELATIVE inverse depth. The API must not
-    # present it as metres: metric fields are null and the relative range is given
-    # in normalised inverse-depth units instead.
-    assert depth_data["depth_type"] == "relative"
-    assert depth_data["depth_unit"] == "relative_inverse_depth"
-    assert depth_data["is_metric"] is False
-    assert depth_data["min_depth_m"] is None
-    assert depth_data["max_depth_m"] is None
-    assert depth_data["mean_depth_m"] is None
-    assert 0.0 <= depth_data["relative_min"] <= depth_data["relative_max"] <= 1.0
-    assert 0.0 < depth_data["relative_mean"] <= 1.0
-    assert depth_data["model_id"] in {"pretrained", "jatayuv_drone_v1"}
-    assert len(depth_data["checkpoint_sha256"]) == 64
-    assert depth_data["inference_ms"] > 0
-
-    # 4. Semantic Segmentation
-    seg_resp = client.post("/api/v1/analysis/segmentation", json={"image_id": pre_id})
-    assert seg_resp.status_code == 200
-    seg_data = seg_resp.json()
-    assert os.path.exists(seg_data["mask_path"])
-    assert os.path.exists(seg_data["overlay_path"])
-    assert isinstance(seg_data["class_distribution"], dict)
-    assert "building" in seg_data["class_distribution"]
-
-    # 5. Building Damage Assessment (xBD)
-=======
     # 3. Depth: force a definitely-missing checkpoint, then require an explicit 503.
     import dataclasses
 
@@ -176,27 +120,15 @@ def test_ai_endpoints_fail_explicitly_and_change_detection_still_works(tmp_path,
     from backend.app.services.damage_assessment import damage_service
 
     monkeypatch.setattr(damage_service, "_checkpoint_path", str(tmp_path / "none.pth"))
->>>>>>> 0400f2f (p5-udpated)
     damage_resp = client.post(
         "/api/v1/analysis/damage",
         json={"pre_image_id": pre_id, "post_image_id": post_id},
     )
-<<<<<<< HEAD
-    assert damage_resp.status_code == 200
-    damage_data = damage_resp.json()
-    assert os.path.exists(damage_data["damage_overlay_path"])
-    assert "no_damage" in damage_data["counts_by_level"]
-    assert "destroyed" in damage_data["counts_by_level"]
-    assert 0.0 <= damage_data["severity_index"] <= 1.0
-
-    # 6. Bi-Temporal Change Detection
-=======
     detail = _unavailable_resp(damage_resp)
     assert detail["service"] == "damage_assessment"
     assert client.get(f"/api/v1/analysis/damage/{pre_id}/{post_id}").status_code == 404
 
     # 6. Change detection is genuine image processing (no learned weights) and completes.
->>>>>>> 0400f2f (p5-udpated)
     change_resp = client.post(
         "/api/v1/analysis/change",
         json={"before_image_id": pre_id, "after_image_id": post_id},
@@ -208,27 +140,14 @@ def test_ai_endpoints_fail_explicitly_and_change_detection_still_works(tmp_path,
     assert change_data["changed_pixels"] > 0
     assert change_data["changed_area_pct"] > 0
 
-<<<<<<< HEAD
-    # 7. Multi-Image 3D Photogrammetry
-=======
     # 7. 3D reconstruction without COLMAP: explicit 503, no PLY and no record.
     from backend.app.services import reconstruction as reconstruction_module
 
     monkeypatch.setattr(reconstruction_module.reconstruction_service, "colmap_exe", None)
->>>>>>> 0400f2f (p5-udpated)
     recon_resp = client.post(
         "/api/v1/reconstruction/3d",
         json={"project_id": project_id, "image_ids": [pre_id, post_id]},
     )
-<<<<<<< HEAD
-    assert recon_resp.status_code == 200
-    recon_data = recon_resp.json()
-    assert os.path.exists(recon_data["pointcloud_ply_path"])
-    assert recon_data["num_points"] > 0
-    assert recon_data["reprojection_error_px"] < 1.0
-    assert "min_x" in recon_data["bounds"]
-
-=======
     detail = _unavailable_resp(recon_resp)
     assert "COLMAP" in detail["message"]
     assert client.get(f"/api/v1/reconstruction/3d/{project_id}").status_code == 404
@@ -239,4 +158,3 @@ def test_ai_endpoints_fail_explicitly_and_change_detection_still_works(tmp_path,
             f"pointcloud_{project_id}.ply",
         )
     )
->>>>>>> 0400f2f (p5-udpated)

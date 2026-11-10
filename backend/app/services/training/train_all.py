@@ -24,11 +24,7 @@ from backend.app.services.training.export import verify_and_register_checkpoint
 from backend.app.services.depth_estimation import depth_service
 from backend.app.services.depth_engine import DepthModelError
 from training.models.dav2_factory import build_dav2_small, load_checkpoint_strict
-<<<<<<< HEAD
-from backend.app.services.photogrammetry import photogrammetry_service
-=======
 from backend.app.services.photogrammetry import ReconstructionError, photogrammetry_service
->>>>>>> 0400f2f (p5-udpated)
 
 def setup_aerial_datasets():
     """Ensures real formatted aerial datasets are populated in storage/datasets."""
@@ -318,24 +314,6 @@ def train_and_evaluate_all():
     mesh_path = os.path.join(recon_dir, "mesh_surface.obj")
     dsm_path = os.path.join(recon_dir, "dsm_elevation.tif")
 
-<<<<<<< HEAD
-    recon_res = photogrammetry_service.reconstruct_3d_pointcloud(
-        image_paths=datasets["colmap_images"],
-        output_ply_path=ply_path,
-        output_mesh_path=mesh_path,
-        output_dsm_path=dsm_path
-    )
-    reports["colmap_3d_reconstruction"] = {
-        "num_points": recon_res["num_points"],
-        "camera_count": recon_res["camera_count"],
-        "reprojection_error_px": recon_res["reprojection_error_px"],
-        "bounds": recon_res["bounds"],
-        "ply_path": ply_path,
-        "mesh_path": mesh_path,
-        "dsm_path": dsm_path
-    }
-    print(f"COLMAP 3D Reconstructed {recon_res['num_points']} points from {recon_res['camera_count']} cameras (reprojection error: {recon_res['reprojection_error_px']} px)")
-=======
     try:
         recon_res = photogrammetry_service.reconstruct_3d_pointcloud(
             image_paths=datasets["colmap_images"],
@@ -369,7 +347,6 @@ def train_and_evaluate_all():
             "details": getattr(exc, "details", {}),
         }
         print(f"COLMAP 3D reconstruction not produced ({getattr(exc, 'status', 'failed')}): {exc}")
->>>>>>> 0400f2f (p5-udpated)
 
     # -------------------------------------------------------------
     # Save Consolidated Evaluation Report JSON

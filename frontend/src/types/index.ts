@@ -153,14 +153,11 @@ export interface ChangeDetectionResult {
   created_at: string;
 }
 
-<<<<<<< HEAD
-=======
 /**
  * Result of a real COLMAP reconstruction. `reprojection_error_px` is only present
  * when COLMAP reported it; `bounds` is null when the cloud bounds were unavailable.
  * COLMAP output is not georeferenced, so no DSM is produced.
  */
->>>>>>> 0400f2f (p5-udpated)
 export interface Reconstruction3DResult {
   id: string;
   job_id: string;
@@ -170,11 +167,7 @@ export interface Reconstruction3DResult {
   dsm_tiff_path?: string;
   num_points: number;
   camera_count: number;
-<<<<<<< HEAD
-  reprojection_error_px: number;
-=======
   reprojection_error_px: number | null;
->>>>>>> 0400f2f (p5-udpated)
   bounds: {
     min_x: number;
     max_x: number;
@@ -182,12 +175,6 @@ export interface Reconstruction3DResult {
     max_y: number;
     min_z: number;
     max_z: number;
-<<<<<<< HEAD
-  };
-  created_at: string;
-}
-
-=======
   } | null;
   backend?: string | null;
   status?: string | null;
@@ -328,4 +315,3 @@ export interface EnqueueProcessingResponse {
   status: string;
 }
 
->>>>>>> 0400f2f (p5-udpated)

@@ -1,7 +1,7 @@
 from typing import Dict, List
 
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker, scoped_session
 from backend.app.core.config import settings
 
 # SQLite connection args for multithreaded fast access
@@ -16,8 +16,11 @@ engine = create_engine(
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+db = scoped_session(SessionLocal)
 
 Base = declarative_base()
+Base.query = db.query_property()
+
 
 
 def ensure_sqlite_columns(table: str, columns: Dict[str, str]) -> List[str]:

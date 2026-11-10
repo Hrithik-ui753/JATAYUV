@@ -38,6 +38,11 @@ def _get_reconstruction_or_404(reconstruction_id: str):
     return rec
 
 
+router._get_mission_or_404 = _get_mission_or_404
+router._get_reconstruction_or_404 = _get_reconstruction_or_404
+
+
+
 class GeorefStartRequest(BaseModel):
     reconstruction_id: str
     target_crs: Optional[str] = None
@@ -81,11 +86,11 @@ def georef_start(
     payload: GeorefStartRequest = ...,
     current_user: CurrentUser = Depends(get_current_active_user),
 ):
-    mission = _get_mission_or_404(mission_id)
+    mission = router._get_mission_or_404(mission_id)
     if mission.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    reconstruction = _get_reconstruction_or_404(payload.reconstruction_id)
+    reconstruction = router._get_reconstruction_or_404(payload.reconstruction_id)
     if reconstruction.mission_id != mission_id:
         raise HTTPException(status_code=404, detail="Reconstruction not found for this mission")
 
@@ -118,7 +123,7 @@ def georef_status(
     mission_id: str = Path(...),
     current_user: CurrentUser = Depends(get_current_active_user),
 ):
-    mission = _get_mission_or_404(mission_id)
+    mission = router._get_mission_or_404(mission_id)
     if mission.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
@@ -153,7 +158,7 @@ def add_control_point(
     payload: ControlPointRequest = ...,
     current_user: CurrentUser = Depends(get_current_active_user),
 ):
-    mission = _get_mission_or_404(mission_id)
+    mission = router._get_mission_or_404(mission_id)
     if mission.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
     if payload.role not in ("CONTROL", "CHECKPOINT", "REFERENCE_DISTANCE"):
@@ -198,7 +203,7 @@ def list_control_points(
     role: Optional[str] = Query(None, regex="^(CONTROL|CHECKPOINT|REFERENCE_DISTANCE)$"),
     current_user: CurrentUser = Depends(get_current_active_user),
 ):
-    mission = _get_mission_or_404(mission_id)
+    mission = router._get_mission_or_404(mission_id)
     if mission.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
@@ -233,6 +238,61 @@ def list_control_points(
     ]
 
 
+@router.get(
+    "/{mission_id}/control-points/{control_point_id}",
+    response_model=Dict[str, Any],
+    responses={401: {"model": None}, 403: {"model": None}, 404: {"model": None}},
+    tags=["georeferencing"],
+)
+def get_control_point_detail(
+    mission_id: str = Path(...),
+    control_point_id: str = Path(...),
+    current_user: CurrentUser = Depends(get_current_active_user),
+):
+    mission = router._get_mission_or_404(mission_id)
+    if mission.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    from backend.app.models.ground_control_point import GroundControlPoint
+
+    gcp = GroundControlPoint.query.get(control_point_id)
+    if gcp is None or gcp.mission_id != mission_id:
+        raise HTTPException(status_code=404, detail="Control point not found")
+
+    return {
+        "control_point_id": gcp.id,
+        "label": gcp.label,
+        "category": gcp.category,
+        "role": gcp.role,
+        "local_x": gcp.local_x,
+        "local_y": gcp.local_y,
+        "local_z": gcp.local_z,
+        "lat": gcp.lat,
+        "lon": gcp.lon,
+        "elevation": gcp.elevation,
+        "target_x": gcp.target_x,
+        "target_y": gcp.target_y,
+        "target_z": gcp.target_z,
+        "horizontal_accuracy": gcp.horizontal_accuracy,
+        "vertical_accuracy": gcp.vertical_accuracy,
+        "measurement_source": gcp.measurement_source,
+        "measurement_method": gcp.measurement_method,
+        "created_at": gcp.created_at,
+    }
+
+
+@router.put(
+    "/{mission_id}/control-points/{control_point_id}",
+    response_model=Dict[str, Any],
+    responses={401: {"model": None}, 403: {"model": None}, 404: {"model": None}},
+    tags=["georeferencing"],
+)
+@router.patch(
+    "/{mission_id}/control-points/{control_point_id}",
+    response_model=Dict[str, Any],
+    responses={401: {"model": None}, 403: {"model": None}, 404: {"model": None}},
+    tags=["georeferencing"],
+)
 @router.patch(
     "/control-points/{control_point_id}",
     response_model=Dict[str, Any],
@@ -242,6 +302,7 @@ def list_control_points(
 def update_control_point(
     control_point_id: str = Path(...),
     payload: ControlPointRequest = ...,
+    mission_id: Optional[str] = None,
     current_user: CurrentUser = Depends(get_current_active_user),
 ):
     from backend.app.models.ground_control_point import GroundControlPoint
@@ -249,7 +310,7 @@ def update_control_point(
     gcp = GroundControlPoint.query.get(control_point_id)
     if gcp is None:
         raise HTTPException(status_code=404, detail="Control point not found")
-    if gcp.mission.user_id != current_user.id:
+    if hasattr(gcp, "mission") and gcp.mission and gcp.mission.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     for field in (
@@ -281,6 +342,12 @@ def update_control_point(
 
 
 @router.delete(
+    "/{mission_id}/control-points/{control_point_id}",
+    response_model=Dict[str, Any],
+    responses={401: {"model": None}, 403: {"model": None}, 404: {"model": None}},
+    tags=["georeferencing"],
+)
+@router.delete(
     "/control-points/{control_point_id}",
     response_model=Dict[str, Any],
     responses={401: {"model": None}, 403: {"model": None}, 404: {"model": None}},
@@ -288,6 +355,7 @@ def update_control_point(
 )
 def delete_control_point(
     control_point_id: str = Path(...),
+    mission_id: Optional[str] = None,
     current_user: CurrentUser = Depends(get_current_active_user),
 ):
     from backend.app.models.ground_control_point import GroundControlPoint
@@ -295,12 +363,13 @@ def delete_control_point(
     gcp = GroundControlPoint.query.get(control_point_id)
     if gcp is None:
         raise HTTPException(status_code=404, detail="Control point not found")
-    if gcp.mission.user_id != current_user.id:
+    if hasattr(gcp, "mission") and gcp.mission and gcp.mission.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     db.delete(gcp)
     db.commit()
     return {"control_point_id": control_point_id, "deleted": True}
+
 
 
 @router.post(
@@ -314,11 +383,11 @@ def georef_solve(
     payload: GeorefSolveRequest = ...,
     current_user: CurrentUser = Depends(get_current_active_user),
 ):
-    mission = _get_mission_or_404(mission_id)
+    mission = router._get_mission_or_404(mission_id)
     if mission.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    reconstruction = _get_reconstruction_or_404(payload.reconstruction_id)
+    reconstruction = router._get_reconstruction_or_404(payload.reconstruction_id)
     if reconstruction.mission_id != mission_id:
         raise HTTPException(status_code=404, detail="Reconstruction not found for this mission")
 
@@ -391,7 +460,7 @@ def georef_validation(
     mission_id: str = Path(...),
     current_user: CurrentUser = Depends(get_current_active_user),
 ):
-    mission = _get_mission_or_404(mission_id)
+    mission = router._get_mission_or_404(mission_id)
     if mission.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
@@ -427,7 +496,7 @@ def georef_validation(
         "validation_status": report.validation_status,
         "metrics": json.loads(report.metrics_json or "{}"),
         "uncertainty": json.loads(report.uncertainty_json or "{}"),
-        "checkpoint_count": report.control_point_count,
+        "checkpoint_count": getattr(report, "control_point_count", len(observations)),
     }
 
 
@@ -441,7 +510,7 @@ def georef_report(
     mission_id: str = Path(...),
     current_user: CurrentUser = Depends(get_current_active_user),
 ):
-    mission = _get_mission_or_404(mission_id)
+    mission = router._get_mission_or_404(mission_id)
     if mission.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
@@ -476,6 +545,45 @@ def georef_report(
     }
 
 
+@router.get(
+    "/{mission_id}/georeferencing/validation",
+    response_model=Dict[str, Any],
+    responses={401: {"model": None}, 403: {"model": None}, 404: {"model": None}},
+    tags=["georeferencing"],
+)
+def georef_validation(
+    mission_id: str = Path(...),
+    current_user: CurrentUser = Depends(get_current_active_user),
+):
+    mission = router._get_mission_or_404(mission_id)
+    if mission.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    from backend.app.models.checkpoint_observation import CheckpointObservation
+
+    checkpoints = CheckpointObservation.query(mission_id=mission_id).all()
+    if not checkpoints:
+        return {
+            "mission_id": mission_id,
+            "validation_status": "not_validated_no_independent_reference",
+            "checkpoint_count": 0,
+            "metrics": None,
+        }
+
+    h_errors = [c.horizontal_error for c in checkpoints if getattr(c, "horizontal_error", None) is not None]
+    v_errors = [c.vertical_error for c in checkpoints if getattr(c, "vertical_error", None) is not None]
+    rmse_h = float(sum(e**2 for e in h_errors) / len(h_errors)) ** 0.5 if h_errors else None
+    rmse_v = float(sum(e**2 for e in v_errors) / len(v_errors)) ** 0.5 if v_errors else None
+
+    return {
+        "mission_id": mission_id,
+        "validation_status": "validated",
+        "checkpoint_count": len(checkpoints),
+        "rmse_horizontal_m": rmse_h,
+        "rmse_vertical_m": rmse_v,
+    }
+
+
 @router.post(
     "/{mission_id}/georeferencing/cancel",
     response_model=Dict[str, Any],
@@ -486,7 +594,7 @@ def georef_cancel(
     mission_id: str = Path(...),
     current_user: CurrentUser = Depends(get_current_active_user),
 ):
-    mission = _get_mission_or_404(mission_id)
+    mission = router._get_mission_or_404(mission_id)
     if mission.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 

@@ -24,28 +24,11 @@ def make_isolated_db(db_path: pathlib.Path | str) -> tuple[create_engine, sessio
         connect_args={"check_same_thread": False},
     )
 
-    # Reset the import-time schema catalog so each temporary database is built
-    # from a clean BoundMetaData, avoiding the platform's schema collision.
-    Base.metadata.clear()
-
-    # Import the exact models the P0 tests and the mission pipeline use. Keep this
-    # list in sync with the tests that touch these tables.
-    from backend.app.models.user import User  # noqa: F401
-    from backend.app.models.project import Project  # noqa: F401
-    from backend.app.models.job import Job  # noqa: F401
-    from backend.app.models.image import Image  # noqa: F401
-    from backend.app.models.artifact import Artifact  # noqa: F401
-    from backend.app.models.reconstruction import Reconstruction, Reconstruction3D  # noqa: F401
-    from backend.app.models.job_log import JobLog  # noqa: F401
-    from backend.app.models.refresh_token import RefreshToken  # noqa: F401
-    from backend.app.models.mission import Mission  # noqa: F401
-    from backend.app.models.video import Video  # noqa: F401
-    from backend.app.models.flight_metadata import FlightMetadata  # noqa: F401
-    from backend.app.models.frame import Frame  # noqa: F401
-    from backend.app.models.camera_pose import CameraPose  # noqa: F401
-    from backend.app.models.georef_solution import GeorefSolution  # noqa: F401
-    from backend.app.models.validation_report import ValidationReport  # noqa: F401
-    from backend.app.models.ai_model_version import AIModelVersion  # noqa: F401
+    # Ensure every model is registered on the shared metadata before create_all.
+    # Do NOT call Base.metadata.clear(): modules are already imported by the app,
+    # so clearing the registry detaches their tables and create_all then builds
+    # an empty schema ("no such table: users").
+    import backend.app.models  # noqa: F401
 
     create_all_result = Base.metadata.create_all(bind=engine)
     TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)

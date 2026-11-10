@@ -62,6 +62,7 @@ class VideoMetadata:
     ffprobe_json: Dict[str, Any]
     probe_duration_method: Optional[str] = None
     truncated_probe: bool = False
+    probe_backend: str = "ffprobe"
 
 
 @dataclass
@@ -150,6 +151,62 @@ def _parse_rational(text: Optional[str]) -> Optional[float]:
     return num / den
 
 
+def _probe_with_pyav(path: str) -> VideoMetadata:
+    """Read container/stream metadata through PyAV.
+
+    Used only when the ``ffprobe`` executable is not installed. PyAV bundles
+    its own FFmpeg libraries, so this is a real container inspection (not a
+    synthetic or placeholder result). The backend is recorded in
+    ``probe_backend`` so callers can report which tool produced the values.
+    """
+    with av.open(path) as container:
+        video = _ensure_caps_video(container)
+
+        duration: Optional[float] = None
+        if container.duration is not None:
+            duration = float(container.duration) / float(av.time_base)
+        elif video.duration is not None and video.time_base is not None:
+            duration = float(video.duration * video.time_base)
+
+        rate = video.average_rate or video.guessed_rate
+        fps = float(rate) if rate else None
+
+        time_base = video.time_base
+        stream_time_base = (
+            f"{time_base.numerator}/{time_base.denominator}" if time_base else None
+        )
+
+        codec_ctx = video.codec_context
+        codec_name = codec_ctx.name
+        codec_long_name = codec_ctx.codec.long_name if codec_ctx.codec else None
+        pixel_format = codec_ctx.pix_fmt
+        width = codec_ctx.width
+        height = codec_ctx.height
+        nb_frames = video.frames
+        container_format = container.format.name if container.format else "unknown"
+
+    return VideoMetadata(
+        container_format=container_format,
+        duration_seconds=duration,
+        width=width,
+        height=height,
+        nominal_fps=fps,
+        avg_fps=fps,
+        codec_name=codec_name,
+        codec_long_name=codec_long_name,
+        pixel_format=pixel_format,
+        stream_time_base=stream_time_base,
+        nb_frames=nb_frames,
+        has_video=True,
+        ffprobe_exit_code=0,
+        ffprobe_stderr="ffprobe not found on PATH; metadata read via PyAV/FFmpeg",
+        ffprobe_json={},
+        probe_duration_method="container_metadata",
+        truncated_probe=duration is None or duration <= 0.0,
+        probe_backend="pyav",
+    )
+
+
 def probe_video(path: str) -> VideoMetadata:
     """Inspect container and streams without decoding frames."""
     if not os.path.isfile(path):
@@ -158,6 +215,9 @@ def probe_video(path: str) -> VideoMetadata:
     size = os.path.getsize(path)
     if size == 0:
         raise ValueError("Video file is empty")
+
+    if shutil.which("ffprobe") is None:
+        return _probe_with_pyav(path)
 
     returncode, stderr_text, parsed = _run_ffprobe(path)
 
@@ -275,6 +335,7 @@ def _metadata_to_dict(m: VideoMetadata) -> Dict[str, Any]:
         "has_video": m.has_video,
         "probe_duration_method": m.probe_duration_method,
         "truncated_probe": m.truncated_probe,
+        "probe_backend": m.probe_backend,
     }
 
 

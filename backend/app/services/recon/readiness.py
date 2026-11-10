@@ -29,9 +29,9 @@ class ReconstructionReadiness:
             "frame_files_readable": self._all_frames_readable(frames),
             "camera_intrinsics_available": bool(self.mission.camera_intrinsics_json),
             "valid_camera_pose_count": len(valid_pose_ids),
-            "has_poses": len(valid_pose_ids) > 1,
-            "requires_dense_inputs": not (len(frames) > 0 and len(valid_pose_ids) > 1),
-            "ready": len(frames) > 0 and len(valid_pose_ids) > 1 and bool(self.mission.camera_intrinsics_json),
+            "has_poses": len(valid_pose_ids) >= 1,
+            "requires_dense_inputs": not (len(frames) > 0 and len(valid_pose_ids) >= 1),
+            "ready": len(frames) > 0 and len(valid_pose_ids) >= 1 and bool(self.mission.camera_intrinsics_json),
             "warnings": self._warnings(frames, pose_map),
         }
 

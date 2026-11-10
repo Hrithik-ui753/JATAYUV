@@ -15,6 +15,7 @@ from backend.app.schemas.frame import FrameResponse
 from backend.app.schemas.video import VideoResponse
 from backend.app.api.deps import get_current_user
 from backend.app.services.mission_processing import (
+    cancel_video_processing,
     enqueue_full_processing,
     get_processing_report_for_mission,
     get_processing_status_for_mission,
@@ -62,13 +63,38 @@ def enqueue_video_processing(
     if video.mission_id != mission_id:
         raise HTTPException(status_code=400, detail="Video does not belong to this mission")
 
-    result = enqueue_full_processing(
-        mission_id=mission_id,
-        video_id=video_id,
-        user_id=current_user.id,
-        video_processing_config=config.model_dump(exclude_none=True) if config else None,
-    )
+    try:
+        result = enqueue_full_processing(
+            mission_id=mission_id,
+            video_id=video_id,
+            user_id=current_user.id,
+            video_processing_config=config.model_dump(exclude_none=True) if config else None,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
     return result
+
+
+@router.post(
+    "/videos/{video_id}/cancel-processing",
+    status_code=status.HTTP_200_OK,
+)
+def cancel_video_processing_endpoint(
+    video_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return cancel_video_processing(
+            video_id,
+            db=db,
+            user_id=current_user.id,
+            role=current_user.role,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
 
 
 @router.get(

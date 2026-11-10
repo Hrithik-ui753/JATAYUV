@@ -9,6 +9,9 @@ from backend.app.core.security import decode_access_token
 from backend.app.models.user import User
 from backend.app.models.project import Project
 
+# Type alias used by the mission-scoped routers.
+CurrentUser = User
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
 def get_current_user(
@@ -45,6 +48,15 @@ def get_current_user(
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
     return user
+
+def get_current_active_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Return the authenticated user, rejecting inactive accounts."""
+    if not current_user.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
+    return current_user
+
 
 def get_current_active_admin(
     current_user: User = Depends(get_current_user),

@@ -3,6 +3,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.app.api.v1.georef import router
@@ -16,11 +17,16 @@ def _fake_user():
     return u
 
 
-class TestGeorefAPIOwnership:
-    def test_start_requires_mission_ownership(self, monkeypatch):
-        client = TestClient(router)
-        monkeypatch.setattr(get_current_active_user, lambda: _fake_user())
+@pytest.fixture
+def client():
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_current_active_user] = _fake_user
+    return TestClient(app)
 
+
+class TestGeorefAPIOwnership:
+    def test_start_requires_mission_ownership(self, monkeypatch, client):
         mission = MagicMock()
         mission.id = "mission-1"
         mission.user_id = "user-2"
@@ -33,10 +39,7 @@ class TestGeorefAPIOwnership:
         })
         assert response.status_code == 403
 
-    def test_control_point_requires_mission_ownership(self, monkeypatch):
-        client = TestClient(router)
-        monkeypatch.setattr(get_current_active_user, lambda: _fake_user())
-
+    def test_control_point_requires_mission_ownership(self, monkeypatch, client):
         mission = MagicMock()
         mission.id = "mission-1"
         mission.user_id = "user-2"
@@ -53,10 +56,7 @@ class TestGeorefAPIOwnership:
 
 
 class TestGeorefAPIControlPointRoleValidation:
-    def test_invalid_role_rejected(self, monkeypatch):
-        client = TestClient(router)
-        monkeypatch.setattr(get_current_active_user, lambda: _fake_user())
-
+    def test_invalid_role_rejected(self, monkeypatch, client):
         mission = MagicMock()
         mission.id = "mission-1"
         mission.user_id = "user-1"
@@ -71,10 +71,7 @@ class TestGeorefAPIControlPointRoleValidation:
 
 
 class TestGeorefAPISolvePreconditions:
-    def test_solve_fails_without_control_points(self, monkeypatch):
-        client = TestClient(router)
-        monkeypatch.setattr(get_current_active_user, lambda: _fake_user())
-
+    def test_solve_fails_without_control_points(self, monkeypatch, client):
         mission = MagicMock()
         mission.id = "mission-1"
         mission.user_id = "user-1"
@@ -107,10 +104,7 @@ class TestGeorefAPISolvePreconditions:
 
 
 class TestGeorefAPIValidation:
-    def test_validation_returns_not_validated_without_checkpoints(self, monkeypatch):
-        client = TestClient(router)
-        monkeypatch.setattr(get_current_active_user, lambda: _fake_user())
-
+    def test_validation_returns_not_validated_without_checkpoints(self, monkeypatch, client):
         mission = MagicMock()
         mission.id = "mission-1"
         mission.user_id = "user-1"
@@ -133,10 +127,7 @@ class TestGeorefAPIValidation:
         assert response.status_code == 200
         assert response.json()["validation_status"] == "not_validated_no_independent_reference"
 
-    def test_validation_returns_validated_with_checkpoints(self, monkeypatch):
-        client = TestClient(router)
-        monkeypatch.setattr(get_current_active_user, lambda: _fake_user())
-
+    def test_validation_returns_validated_with_checkpoints(self, monkeypatch, client):
         mission = MagicMock()
         mission.id = "mission-1"
         mission.user_id = "user-1"
@@ -164,3 +155,4 @@ class TestGeorefAPIValidation:
         response = client.get("/api/v1/missions/mission-1/georeferencing/validation")
         assert response.status_code == 200
         assert response.json()["validation_status"] == "validated"
+

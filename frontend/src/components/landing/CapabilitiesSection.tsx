@@ -23,10 +23,6 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { BeforeAfterSlider } from "@/components/viewer/BeforeAfterSlider";
 import { DepthViewer } from "@/components/viewer/DepthViewer";
-<<<<<<< HEAD
-import { PointCloudViewer } from "@/components/viewer/PointCloudViewer";
-=======
->>>>>>> 0400f2f (p5-udpated)
 
 export function CapabilitiesSection() {
   const [activeCapability, setActiveCapability] = useState<"depth" | "segmentation" | "damage" | "change" | "3d">("damage");
@@ -489,13 +485,6 @@ export function CapabilitiesSection() {
                     <Box className="w-4 h-4 text-cyan-400" />
                     3D DENSE POINT CLOUD RECONSTRUCTION
                   </span>
-<<<<<<< HEAD
-                  <span>124,800 POINTS RENDERED</span>
-                </div>
-
-                <div className="h-[380px] w-full rounded-lg overflow-hidden border border-emerald-500/30">
-                  <PointCloudViewer numPoints={45000} />
-=======
                   <span>ILLUSTRATIVE PREVIEW</span>
                 </div>
 
@@ -513,7 +502,6 @@ export function CapabilitiesSection() {
                     <Box className="w-8 h-8 text-cyan-400/70" />
                     <span>Hover a mission&apos;s 3D tab to load its verified point cloud</span>
                   </div>
->>>>>>> 0400f2f (p5-udpated)
                 </div>
               </div>
 

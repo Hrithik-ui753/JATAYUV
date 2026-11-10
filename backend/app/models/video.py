@@ -16,7 +16,6 @@ from backend.app.core.database import Base
 class Video(Base):
     __tablename__ = "videos"
     __table_args__ = (
-        Index("ix_videos_mission_id", "mission_id"),
         Index("ix_videos_created_at", "created_at"),
         UniqueConstraint("mission_id", "original_filename", name="uq_mission_filename"),
     )

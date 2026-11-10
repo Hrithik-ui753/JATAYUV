@@ -8,8 +8,6 @@ import cv2
 import numpy as np
 import numpy.typing as npt
 
-from backend.app.services.perception import describe_dynamic_detection_model
-
 log = logging.getLogger("jatayuv.perception.dynamic")
 
 Detection = Dict[str, Any]
@@ -89,16 +87,25 @@ def build_dynamic_exclusion_mask(
 
 
 def is_dynamic_detection_available() -> bool:
-    from backend.app.services.perception.dynamic import (
-        describe_dynamic_detection_model as _describe,
-    )
-
-    info = _describe()
+    info = describe_dynamic_model()
     return bool(info.get("checkpoint_available")) and bool(info.get("model_id"))
 
 
 def describe_dynamic_model() -> Dict[str, Any]:
-    return describe_dynamic_detection_model()
+    cats = sorted(list(_DYNAMIC_CATEGORIES))
+    return {
+        "model_id": None,
+        "model_name": "YOLO-Aerial / Dynamic Object Detector",
+        "checkpoint_available": False,
+        "classes": cats,
+        "supported_categories": cats,
+        "notes": "No dynamic object detector checkpoint installed.",
+        "status": "unavailable",
+    }
+
+
+describe_dynamic_detection_model = describe_dynamic_model
+
 
 
 _DYNAMIC_CATEGORIES = {

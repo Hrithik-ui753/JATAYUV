@@ -38,13 +38,20 @@ from backend.app.services.perception.depth import (  # noqa: F401
 from backend.app.services.perception.segmentation import (  # noqa: F401
     SegmentationInferenceResult,
     describe_segmentation_model as describe_segmentation_model,
+    describe_supported_segmentation_classes as describe_supported_segmentation_classes,
+    map_segmentation_target_to_model_class as map_segmentation_target_to_model_class,
     infer_segmentation as infer_segmentation,
     is_segmentation_available as is_segmentation_available,
 )
 
 from backend.app.services.perception.dynamic import (  # noqa: F402
     DynamicDetectionResult,
+    build_dynamic_exclusion_mask as build_dynamic_exclusion_mask,
     describe_dynamic_model as describe_dynamic_model,
     infer_dynamic_objects as infer_dynamic_objects,
     is_dynamic_detection_available as is_dynamic_detection_available,
+)
+
+from backend.app.services.perception.integration import (  # noqa: F401
+    describe_all_perception_models as describe_all_perception_models,
 )

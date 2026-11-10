@@ -37,7 +37,7 @@ class TestReconstructionReadiness:
                 def filter(self, *a, **kw):
                     return self
                 def all(self):
-                    if "selected" in str(kw):
+                    if "selected" in str(kwargs):
                         return [frame]
                     return [pose]
                 def offset(self, *a, **kw):
@@ -82,7 +82,7 @@ class TestReconstructionReadiness:
                 def filter(self, *a, **kw):
                     return self
                 def all(self):
-                    if "selected" in str(kw):
+                    if "selected" in str(kwargs):
                         return [frame]
                     return [pose]
                 def offset(self, *a, **kw):
@@ -129,7 +129,7 @@ class TestReconstructionReadiness:
                 def filter(self, *a, **kw):
                     return self
                 def all(self):
-                    if "selected" in str(kw):
+                    if "selected" in str(kwargs):
                         return frames
                     return [pose]
                 def offset(self, *a, **kw):

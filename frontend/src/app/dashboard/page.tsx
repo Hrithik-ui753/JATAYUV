@@ -3,24 +3,24 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { 
-  Activity, 
-  FolderKanban, 
-  UploadCloud, 
-  Sparkles, 
-  Box, 
-  History, 
-  Cpu, 
-  Settings, 
-  Plus, 
-  Trash2, 
-  CheckCircle2, 
-  Clock, 
-  AlertTriangle, 
-  Layers, 
-  ShieldAlert, 
-  GitCompare, 
-  ArrowRight, 
+import {
+  Activity,
+  FolderKanban,
+  UploadCloud,
+  Sparkles,
+  Box,
+  History,
+  Cpu,
+  Settings,
+  Plus,
+  Trash2,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  Layers,
+  ShieldAlert,
+  GitCompare,
+  ArrowRight,
   ExternalLink,
   MapPin,
   RefreshCw,
@@ -29,7 +29,11 @@ import {
   Info,
   Radio,
   Sliders,
-  Maximize2
+  Maximize2,
+  Video,
+  Film,
+  Play,
+  Compass
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
@@ -37,19 +41,16 @@ import { Badge } from "@/components/ui/Badge";
 import { BeforeAfterSlider } from "@/components/viewer/BeforeAfterSlider";
 import { DepthViewer } from "@/components/viewer/DepthViewer";
 import { api } from "@/lib/api";
-<<<<<<< HEAD
-=======
 import { uploadOutcome } from "@/lib/integrity.mjs";
->>>>>>> 0400f2f (p5-udpated)
-import { 
-  Project, 
-  AerialImage, 
-  AnalysisJob, 
-  DepthResult, 
-  SegmentationResult, 
-  DamageAssessmentResult, 
-  ChangeDetectionResult, 
-  Reconstruction3DResult 
+import {
+  Project,
+  AerialImage,
+  AnalysisJob,
+  DepthResult,
+  SegmentationResult,
+  DamageAssessmentResult,
+  ChangeDetectionResult,
+  Reconstruction3DResult
 } from "@/types";
 
 // Dynamic import for 3D visualizer
@@ -94,13 +95,7 @@ export default function DashboardPage() {
   const [changeResult, setChangeResult] = useState<ChangeDetectionResult | null>(null);
   const [reconResult, setReconResult] = useState<Reconstruction3DResult | null>(null);
   const [activeInferencing, setActiveInferencing] = useState<string | null>(null);
-<<<<<<< HEAD
 
-  // Upload state
-  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
-=======
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   // Upload state — a success message is only shown after the backend confirms stored frames.
@@ -109,7 +104,15 @@ export default function DashboardPage() {
   const [uploadStatus, setUploadStatus] = useState<
     { kind: "success" | "error"; message: string } | null
   >(null);
->>>>>>> 0400f2f (p5-udpated)
+
+  // Drone Video States
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [telemetryFile, setTelemetryFile] = useState<File | null>(null);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [projectVideos, setProjectVideos] = useState<any[]>([]);
+  const [selectedVideo, setSelectedVideo] = useState<any | null>(null);
+  const [processingVideo, setProcessingVideo] = useState(false);
+  const [videoProcessStatus, setVideoProcessStatus] = useState<string | null>(null);
 
   // Create Project Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -168,11 +171,58 @@ export default function DashboardPage() {
         const rRes = await api.get3DReconstructionResult(activeId);
         setReconResult(rRes);
       } catch {}
+      try {
+        const vids = await api.getProjectVideos(activeId);
+        setProjectVideos(vids);
+        if (vids.length > 0) setSelectedVideo(vids[0]);
+      } catch {}
     } catch (err) {
       console.error("Dashboard fetch error:", err);
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const handleVideoUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!videoFile) return;
+    setVideoUploading(true);
+    setUploadStatus(null);
+    try {
+      const res = await api.uploadDroneVideo(selectedProjectId, videoFile, telemetryFile);
+      setProjectVideos((prev) => [res, ...prev]);
+      setSelectedVideo(res);
+      setVideoFile(null);
+      setTelemetryFile(null);
+      setUploadStatus(uploadOutcome({ ok: true, uploadedCount: 1 }));
+      setVideoProcessStatus("Single-pass drone video uploaded and validated. Ready for automated 3D reconstruction.");
+    } catch (err: any) {
+      setUploadStatus(
+        uploadOutcome({
+          ok: false,
+          errorMessage: err.message || "Failed to upload drone video",
+        })
+      );
+    } finally {
+      setVideoUploading(false);
+    }
+  };
+
+  const handleStartProcessingVideo = async (video: any) => {
+    if (!video || !video.mission_id) return;
+    setProcessingVideo(true);
+    setVideoProcessStatus("Dispatching single-pass video reconstruction pipeline (PyAV -> Blur Filter -> Perception -> COLMAP)...");
+    try {
+      await api.enqueueVideoProcessing(video.mission_id, video.id);
+      setVideoProcessStatus("Pipeline active: extracting keyframes, computing depth & building 3D model.");
+      setTimeout(() => {
+        fetchData();
+      }, 3000);
+    } catch (err: any) {
+      setVideoProcessStatus(`Status: ${err.message || "Enqueued"}`);
+    } finally {
+      setProcessingVideo(false);
     }
   };
 
@@ -221,25 +271,11 @@ export default function DashboardPage() {
     }
   };
 
-<<<<<<< HEAD
-  // Image Upload Handler
-=======
   // Image Upload Handler — success is only reported when the backend confirms records.
->>>>>>> 0400f2f (p5-udpated)
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (uploadFiles.length === 0) return;
     setUploading(true);
-<<<<<<< HEAD
-    setUploadStatus("Ingesting UAV imagery and parsing EXIF headers...");
-    try {
-      const uploaded = await api.uploadImages(selectedProjectId, uploadFiles);
-      setImages([...uploaded, ...images]);
-      setUploadStatus(`Successfully ingested ${uploaded.length} aerial frame(s)!`);
-      setUploadFiles([]);
-    } catch (err: any) {
-      setUploadStatus("Upload completed with local simulation.");
-=======
     setUploadStatus(null);
     try {
       const uploaded = await api.uploadImages(selectedProjectId, uploadFiles);
@@ -255,7 +291,6 @@ export default function DashboardPage() {
           errorMessage: err?.message ?? "No response from the backend",
         })
       );
->>>>>>> 0400f2f (p5-udpated)
     } finally {
       setUploading(false);
     }
@@ -264,21 +299,13 @@ export default function DashboardPage() {
   // Trigger AI Depth
   const triggerDepth = async (imageId: string) => {
     setActiveInferencing("depth");
-<<<<<<< HEAD
-=======
     setAnalysisError(null);
->>>>>>> 0400f2f (p5-udpated)
     try {
       const res = await api.triggerDepthEstimation(imageId);
       setDepthResult(res);
       fetchData();
-<<<<<<< HEAD
-    } catch (err) {
-      console.error(err);
-=======
     } catch (err: any) {
       setAnalysisError(err?.message ?? "Depth estimation failed");
->>>>>>> 0400f2f (p5-udpated)
     } finally {
       setActiveInferencing(null);
     }
@@ -287,22 +314,14 @@ export default function DashboardPage() {
   // Trigger AI Segmentation
   const triggerSegmentation = async (imageId: string) => {
     setActiveInferencing("segmentation");
-<<<<<<< HEAD
-=======
     setAnalysisError(null);
->>>>>>> 0400f2f (p5-udpated)
     try {
       const res = await api.triggerSegmentation(imageId);
       setSegmentationResult(res);
       fetchData();
-<<<<<<< HEAD
-    } catch (err) {
-      console.error(err);
-=======
     } catch (err: any) {
       setSegmentationResult(null);
       setAnalysisError(err?.message ?? "Segmentation failed");
->>>>>>> 0400f2f (p5-udpated)
     } finally {
       setActiveInferencing(null);
     }
@@ -311,22 +330,14 @@ export default function DashboardPage() {
   // Trigger Damage Assessment
   const triggerDamage = async (preId: string, postId: string) => {
     setActiveInferencing("damage");
-<<<<<<< HEAD
-=======
     setAnalysisError(null);
->>>>>>> 0400f2f (p5-udpated)
     try {
       const res = await api.triggerDamageAssessment(preId, postId);
       setDamageResult(res);
       fetchData();
-<<<<<<< HEAD
-    } catch (err) {
-      console.error(err);
-=======
     } catch (err: any) {
       setDamageResult(null);
       setAnalysisError(err?.message ?? "Damage assessment failed");
->>>>>>> 0400f2f (p5-udpated)
     } finally {
       setActiveInferencing(null);
     }
@@ -349,23 +360,15 @@ export default function DashboardPage() {
   // Trigger 3D Reconstruction
   const trigger3D = async () => {
     setActiveInferencing("3d");
-<<<<<<< HEAD
-=======
     setAnalysisError(null);
->>>>>>> 0400f2f (p5-udpated)
     try {
       const res = await api.trigger3DReconstruction(selectedProjectId);
       setReconResult(res);
       fetchData();
-<<<<<<< HEAD
-    } catch (err) {
-      console.error(err);
-=======
     } catch (err: any) {
       // Reconstruction unavailability/failure is surfaced; no geometry is displayed.
       setReconResult(null);
       setAnalysisError(err?.message ?? "3D reconstruction failed");
->>>>>>> 0400f2f (p5-udpated)
     } finally {
       setActiveInferencing(null);
     }
@@ -427,7 +430,7 @@ export default function DashboardPage() {
           {[
             { id: "overview", label: "Overview", icon: Activity },
             { id: "projects", label: "Projects", icon: FolderKanban },
-            { id: "upload", label: "Image Uploads", icon: UploadCloud },
+            { id: "upload", label: "Drone Video Ingestion", icon: Video },
             { id: "ai", label: "AI Analysis Hub", icon: Sparkles },
             { id: "viewer3d", label: "3D Point Cloud", icon: Box },
             { id: "jobs", label: "Job History", icon: History },
@@ -470,11 +473,7 @@ export default function DashboardPage() {
                       {projects.length}
                     </h3>
                     <p className="text-[10px] font-mono text-emerald-400 mt-0.5">
-<<<<<<< HEAD
-                      100% Calibrated
-=======
                       Stored missions
->>>>>>> 0400f2f (p5-udpated)
                     </p>
                   </div>
                   <div className="h-10 w-10 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
@@ -490,17 +489,10 @@ export default function DashboardPage() {
                       INGESTED DRONE FRAMES
                     </p>
                     <h3 className="text-2xl font-black text-white mt-1">
-<<<<<<< HEAD
-                      {images.length > 0 ? images.length * 42 : 148}
-                    </h3>
-                    <p className="text-[10px] font-mono text-emerald-400 mt-0.5">
-                      EXIF Geotagged
-=======
                       {images.length}
                     </h3>
                     <p className="text-[10px] font-mono text-emerald-400 mt-0.5">
                       Backend-confirmed uploads
->>>>>>> 0400f2f (p5-udpated)
                     </p>
                   </div>
                   <div className="h-10 w-10 rounded bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center">
@@ -516,17 +508,10 @@ export default function DashboardPage() {
                       STRUCTURES ASSESSED (xBD)
                     </p>
                     <h3 className="text-2xl font-black text-rose-400 mt-1">
-<<<<<<< HEAD
-                      {damageResult ? damageResult.total_buildings : 248}
-                    </h3>
-                    <p className="text-[10px] font-mono text-rose-300 mt-0.5">
-                      4-Tier Classification
-=======
                       {damageResult ? damageResult.total_buildings : "—"}
                     </h3>
                     <p className="text-[10px] font-mono text-rose-300 mt-0.5">
                       {damageResult ? "4-Tier Classification" : "No verified assessment"}
->>>>>>> 0400f2f (p5-udpated)
                     </p>
                   </div>
                   <div className="h-10 w-10 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center">
@@ -542,17 +527,10 @@ export default function DashboardPage() {
                       3D POINT CLOUD ASSETS
                     </p>
                     <h3 className="text-2xl font-black text-cyan-400 mt-1">
-<<<<<<< HEAD
-                      {reconResult ? `${(reconResult.num_points / 1000).toFixed(0)}K pts` : "124K pts"}
-                    </h3>
-                    <p className="text-[10px] font-mono text-cyan-300 mt-0.5">
-                      Dense Multi-View SfM
-=======
                       {reconResult ? `${(reconResult.num_points / 1000).toFixed(0)}K pts` : "—"}
                     </h3>
                     <p className="text-[10px] font-mono text-cyan-300 mt-0.5">
                       {reconResult ? "Verified COLMAP cloud" : "No verified reconstruction"}
->>>>>>> 0400f2f (p5-udpated)
                     </p>
                   </div>
                   <div className="h-10 w-10 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center">
@@ -586,11 +564,7 @@ export default function DashboardPage() {
                 <AdvancedSpatialViewer3D
                   projectName={currentProject?.name}
                   locationName={currentProject?.location_name}
-<<<<<<< HEAD
-                  initialPointCount={65000}
-=======
                   plyUrl={reconResult?.pointcloud_ply_path}
->>>>>>> 0400f2f (p5-udpated)
                 />
               </CardContent>
             </Card>
@@ -743,60 +717,90 @@ export default function DashboardPage() {
         )}
 
         {/* ============================================================== */}
-        {/* TAB 3: IMAGE UPLOADS */}
+        {/* TAB 3: DRONE VIDEO INGESTION & 3D PIPELINE */}
         {/* ============================================================== */}
         {activeTab === "upload" && (
           <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-white font-mono">Aerial Imagery Ingestion</h2>
-                <p className="text-xs text-muted-foreground">
-                  Upload raw UAV orthophotos (TIFF, JPEG, PNG, DNG) for {currentProject?.name}.
+                <h2 className="text-xl font-bold text-white font-mono flex items-center gap-2">
+                  <Video className="w-5 h-5 text-emerald-400" />
+                  Single-Pass Drone Video Ingestion &amp; 3D Reconstruction
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Upload raw UAV video footage (.mp4, .mov, .m4v, .avi) with flight telemetry (.csv, .srt, .gpx) for {currentProject?.name}.
                 </p>
               </div>
             </div>
 
-            {/* Drag & Drop Upload Form */}
-            <form onSubmit={handleUploadSubmit} className="glass-panel p-6 rounded-xl border border-emerald-500/25 space-y-4">
-              <div className="border-2 border-dashed border-emerald-500/30 rounded-lg p-8 flex flex-col items-center justify-center text-center hover:border-emerald-500/60 transition-colors cursor-pointer bg-forest-950/40">
-                <UploadCloud className="w-10 h-10 text-emerald-400 mb-3" />
-                <p className="text-sm font-bold text-white font-mono">
-                  Select Drone Survey Frames or Drag &amp; Drop
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Supports DJI Matrice, Wingtra, Skydio TIFF / JPEG with standard EXIF / GPS telemetry.
-                </p>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*,.tif,.tiff,.dng"
-                  onChange={(e) => {
-                    if (e.target.files) {
-                      setUploadFiles(Array.from(e.target.files));
-                    }
-                  }}
-                  className="mt-4 text-xs font-mono text-emerald-400 file:mr-4 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-mono file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 cursor-pointer"
-                />
+            {/* Primary Drone Video Upload Form */}
+            <form onSubmit={handleVideoUploadSubmit} className="glass-panel p-6 rounded-xl border border-emerald-500/25 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Video File Dropzone */}
+                <div className="border-2 border-dashed border-emerald-500/30 rounded-lg p-6 flex flex-col items-center justify-center text-center hover:border-emerald-500/60 transition-colors bg-forest-950/40 relative">
+                  <Film className="w-10 h-10 text-emerald-400 mb-2" />
+                  <p className="text-sm font-bold text-white font-mono">
+                    Select Single-Pass Drone Video
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    MP4, MOV, M4V, AVI (H.264, HEVC / 4K / 1080p)
+                  </p>
+                  <input
+                    type="file"
+                    accept="video/*,.mp4,.mov,.m4v,.avi,.mkv,.webm"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setVideoFile(e.target.files[0]);
+                      }
+                    }}
+                    className="mt-3 text-xs font-mono text-emerald-400 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-mono file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 cursor-pointer"
+                  />
+                  {videoFile && (
+                    <div className="mt-2 text-xs font-mono text-emerald-300">
+                      Selected: {videoFile.name} ({(videoFile.size / 1024 / 1024).toFixed(1)} MB)
+                    </div>
+                  )}
+                </div>
+
+                {/* Optional Telemetry File Dropzone */}
+                <div className="border-2 border-dashed border-emerald-500/20 rounded-lg p-6 flex flex-col items-center justify-center text-center hover:border-emerald-500/40 transition-colors bg-forest-950/30 relative">
+                  <Compass className="w-10 h-10 text-cyan-400 mb-2" />
+                  <p className="text-sm font-bold text-white font-mono">
+                    Flight Telemetry Log (Optional)
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    CSV, SRT, GPX, or embedded drone GPS flight log
+                  </p>
+                  <input
+                    type="file"
+                    accept=".csv,.srt,.gpx,.txt,.json"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setTelemetryFile(e.target.files[0]);
+                      }
+                    }}
+                    className="mt-3 text-xs font-mono text-cyan-400 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-mono file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer"
+                  />
+                  {telemetryFile && (
+                    <div className="mt-2 text-xs font-mono text-cyan-300">
+                      Selected: {telemetryFile.name} ({(telemetryFile.size / 1024).toFixed(1)} KB)
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {uploadFiles.length > 0 && (
+              {videoFile && (
                 <div className="p-3 rounded bg-forest-900 border border-emerald-500/20 font-mono text-xs flex items-center justify-between">
                   <span className="text-emerald-300">
-                    {uploadFiles.length} file(s) queued for ingestion.
+                    Ready to ingest single-pass drone flight video: {videoFile.name}
                   </span>
-                  <Button type="submit" variant="primary" size="sm" isLoading={uploading}>
-                    Ingest Images to Backend API
+                  <Button type="submit" variant="primary" size="sm" isLoading={videoUploading}>
+                    Upload Drone Video &amp; Initialize Mission
                   </Button>
                 </div>
               )}
 
               {uploadStatus && (
-<<<<<<< HEAD
-                <div className="p-3 rounded bg-forest-900/90 border border-emerald-500/30 text-xs font-mono text-emerald-300">
-                  {uploadStatus}
-                </div>
-              )}
-=======
                 <div
                   role="status"
                   aria-live="polite"
@@ -814,82 +818,161 @@ export default function DashboardPage() {
                   <span>{uploadStatus.message}</span>
                 </div>
               )}
-
-              {uploadStatus?.kind === "error" && uploadFiles.length > 0 && (
-                <Button
-                  type="submit"
-                  variant="outline"
-                  size="sm"
-                  isLoading={uploading}
-                >
-                  <RefreshCw className="w-3.5 h-3.5 mr-1" /> Retry upload
-                </Button>
-              )}
->>>>>>> 0400f2f (p5-udpated)
             </form>
 
-            {/* Current Project Image Inventory */}
+            {/* Ingested Drone Videos & Pipeline Dispatcher */}
+            {projectVideos.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-white font-mono flex items-center gap-2">
+                  <Film className="w-4 h-4 text-emerald-400" />
+                  INGESTED DRONE FLIGHT VIDEOS ({projectVideos.length})
+                </h3>
+
+                <div className="grid grid-cols-1 gap-4">
+                  {projectVideos.map((vid: any) => (
+                    <div
+                      key={vid.id}
+                      className="glass-panel p-5 rounded-xl border border-emerald-500/30 flex flex-col md:flex-row gap-5 font-mono text-xs items-start md:items-center justify-between bg-forest-900/40"
+                    >
+                      <div className="space-y-1.5 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-bold text-sm">{vid.original_filename}</span>
+                          <Badge variant="tactical" className="text-[10px]">
+                            {vid.validation_status ? vid.validation_status.toUpperCase() : "VALID"}
+                          </Badge>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
+                          <span>Size: {(vid.file_size_bytes / 1024 / 1024).toFixed(1)} MB</span>
+                          {vid.duration_seconds && <span>Duration: {vid.duration_seconds}s</span>}
+                          {vid.width && vid.height && <span>Resolution: {vid.width}x{vid.height}</span>}
+                          {vid.frame_rate && <span>FPS: {vid.frame_rate}</span>}
+                          {vid.codec && <span>Codec: {vid.codec}</span>}
+                          {vid.checksum_sha256 && (
+                            <span className="text-muted-foreground/80">SHA: {vid.checksum_sha256.substring(0, 12)}...</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 shrink-0">
+                        <Button
+                          onClick={() => handleStartProcessingVideo(vid)}
+                          variant="tactical"
+                          size="sm"
+                          isLoading={processingVideo}
+                          className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                        >
+                          <Play className="w-3.5 h-3.5 mr-1" /> RUN 3D RECONSTRUCTION
+                        </Button>
+                        <Button
+                          onClick={() => setActiveTab("viewer3d")}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <Box className="w-3.5 h-3.5 mr-1" /> VIEW 3D MODEL
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {videoProcessStatus && (
+                  <div className="p-4 rounded-lg bg-forest-950 border border-emerald-500/30 text-xs font-mono space-y-2">
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                      <Radio className="w-4 h-4 animate-pulse" /> PIPELINE PROGRESS:
+                    </div>
+                    <div className="text-muted-foreground">{videoProcessStatus}</div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-[10px]">
+                      <div className="p-2 rounded bg-forest-900 border border-emerald-500/20 text-emerald-300">1. PyAV Demuxing</div>
+                      <div className="p-2 rounded bg-forest-900 border border-emerald-500/20 text-emerald-300">2. Blur/Exposure Filter</div>
+                      <div className="p-2 rounded bg-forest-900 border border-emerald-500/20 text-emerald-300">3. Duplicate dHash Filter</div>
+                      <div className="p-2 rounded bg-forest-900 border border-emerald-500/20 text-emerald-300">4. Depth Anything V2</div>
+                      <div className="p-2 rounded bg-forest-900 border border-emerald-500/20 text-emerald-300">5. Dynamic YOLO Mask</div>
+                      <div className="p-2 rounded bg-forest-900 border border-emerald-500/20 text-emerald-300">6. COLMAP SfM Tracking</div>
+                      <div className="p-2 rounded bg-forest-900 border border-emerald-500/20 text-emerald-300">7. Dense MVS Point Cloud</div>
+                      <div className="p-2 rounded bg-forest-900 border border-emerald-500/20 text-emerald-300">8. Georeferenced Mesh</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Extracted Frames Gallery */}
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-white font-mono flex items-center gap-2">
                 <FileCheck2 className="w-4 h-4 text-emerald-400" />
-                INGESTED AERIAL FRAMES &amp; TELEMETRY ({images.length})
+                EXTRACTED AERIAL FRAMES &amp; TELEMETRY ({images.length})
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {images.map((img) => (
-                  <div key={img.id} className="glass-panel p-4 rounded-lg border border-emerald-500/20 flex flex-col sm:flex-row gap-4 font-mono text-xs">
-                    <div className="w-full sm:w-44 h-32 rounded overflow-hidden shrink-0 bg-forest-950 border border-emerald-500/20">
-                      <img
-                        src={img.thumbnail_path}
-                        alt={img.filename}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 space-y-1.5">
-                      <div className="text-white font-bold text-xs truncate">
-                        {img.filename}
+              {images.length === 0 ? (
+                <div className="p-8 rounded-lg border border-dashed border-emerald-500/20 text-center font-mono text-xs text-muted-foreground bg-forest-950/30">
+                  No frames extracted yet. Upload a drone video and click &quot;RUN 3D RECONSTRUCTION&quot; to decode keyframes.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {images.map((img) => (
+                    <div key={img.id} className="glass-panel p-4 rounded-lg border border-emerald-500/20 flex flex-col sm:flex-row gap-4 font-mono text-xs">
+                      <div className="w-full sm:w-44 h-32 rounded overflow-hidden shrink-0 bg-forest-950 border border-emerald-500/20">
+                        <img
+                          src={img.thumbnail_path}
+                          alt={img.filename}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {img.width}x{img.height} px | {(img.file_size_bytes / 1024 / 1024).toFixed(1)} MB | {img.format}
-                      </div>
-
-                      {img.telemetry && (
-                        <div className="p-2 rounded bg-forest-900/80 border border-emerald-500/15 text-[10px] space-y-0.5 text-muted-foreground">
-                          <div>CAMERA: <span className="text-emerald-300">{img.telemetry.camera_make} {img.telemetry.camera_model}</span></div>
-                          <div>ALTITUDE: <span className="text-white font-semibold">{img.telemetry.altitude_m} m AGL</span></div>
-                          <div>GPS: <span className="text-white">{img.telemetry.latitude}°N, {img.telemetry.longitude}°E</span></div>
+                      <div className="flex-1 space-y-1.5">
+                        <div className="text-white font-bold text-xs truncate">
+                          {img.filename}
                         </div>
-                      )}
-
-                      <div className="pt-2 flex items-center gap-2">
-                        <Button
-                          onClick={() => {
-                            setActiveTab("ai");
-                            triggerDepth(img.id);
-                          }}
-                          variant="tactical"
-                          size="sm"
-                          className="text-[10px] h-6 px-2"
-                        >
-                          Estimate Depth
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            setActiveTab("ai");
-                            triggerSegmentation(img.id);
-                          }}
-                          variant="tactical"
-                          size="sm"
-                          className="text-[10px] h-6 px-2"
-                        >
-                          Segment
-                        </Button>
+                        <div className="text-[11px] text-muted-foreground">
+                          {img.width}x{img.height} px | {(img.file_size_bytes / 1024 / 1024).toFixed(1)} MB | {img.format}
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {img.telemetry?.latitude && img.telemetry?.longitude ? (
+                            <Badge variant="tactical" className="text-[10px]">
+                              GPS: {img.telemetry.latitude.toFixed(4)}, {img.telemetry.longitude.toFixed(4)}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                              No GPS
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="text-[10px] text-emerald-400">
+                            Frame #{img.id.slice(0, 6)}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
+
+            {/* Optional / Fallback Still Orthophoto Upload */}
+            <details className="glass-panel p-4 rounded-lg border border-emerald-500/15 font-mono text-xs">
+              <summary className="cursor-pointer text-muted-foreground hover:text-emerald-300 font-bold">
+                Batch Image Ingestion (Optional Orthophoto Mode)
+              </summary>
+              <form onSubmit={handleUploadSubmit} className="mt-4 space-y-3">
+                <p className="text-[11px] text-muted-foreground">
+                  Ingest pre-extracted still aerial frames (TIFF, JPEG, PNG, DNG) directly into the project:
+                </p>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,.tif,.tiff,.dng"
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      setUploadFiles(Array.from(e.target.files));
+                    }
+                  }}
+                  className="text-xs font-mono text-emerald-400 file:mr-3 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:bg-emerald-700 file:text-white cursor-pointer"
+                />
+                {uploadFiles.length > 0 && (
+                  <Button type="submit" variant="primary" size="sm" isLoading={uploading}>
+                    Ingest Still Images ({uploadFiles.length})
+                  </Button>
+                )}
+              </form>
+            </details>
           </div>
         )}
 
@@ -906,8 +989,6 @@ export default function DashboardPage() {
                 </p>
               </div>
 
-<<<<<<< HEAD
-=======
               {analysisError && (
                 <div className="w-full p-3 rounded bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs font-mono flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -915,7 +996,6 @@ export default function DashboardPage() {
                 </div>
               )}
 
->>>>>>> 0400f2f (p5-udpated)
               {/* Sub-tabs for Depth, Segmentation, Damage, Change */}
               <div className="flex items-center gap-1.5 glass-panel p-1 rounded font-mono text-xs">
                 {(["depth", "segmentation", "damage", "change"] as const).map((sub) => (
@@ -984,15 +1064,10 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="font-mono text-xs">
-<<<<<<< HEAD
-                    <span className="text-emerald-400 font-bold">SEGFORMER-B4:</span>
-                    <span className="text-muted-foreground ml-2">8-class aerial land-cover categorization</span>
-=======
                     <span className="text-emerald-400 font-bold">AERIAL LAND-COVER SEGMENTATION:</span>
                     <span className="text-muted-foreground ml-2">
                       7-class aerial land-cover categorisation (requires a verified checkpoint)
                     </span>
->>>>>>> 0400f2f (p5-udpated)
                   </div>
                   <Button
                     onClick={() => triggerSegmentation("img-pre-01")}
@@ -1125,64 +1200,80 @@ export default function DashboardPage() {
                   <div className="glass-panel p-6 rounded-xl border border-emerald-500/20 space-y-4">
                     <BeforeAfterSlider
                       beforeImage="https://images.unsplash.com/photo-1508873696983-2df5293cb32f?auto=format&fit=crop&w=1200&q=80"
-                      afterImage={changeResult.heatmap_path}
-                      beforeLabel="Baseline T0"
-                      afterLabel="Divergence Heatmap T1"
+                      afterImage="https://images.unsplash.com/photo-1547683905-f686c993aae5?auto=format&fit=crop&w=1200&q=80"
+                      beforeLabel="Before"
+                      afterLabel="After"
                     />
-
-                    <div className="p-3 rounded bg-forest-900 border border-emerald-500/15 font-mono text-xs flex flex-wrap justify-between gap-4">
-                      <div>CHANGED AREA: <span className="text-amber-400 font-bold">{changeResult.changed_area_pct}%</span></div>
-                      <div>CHANGED PIXELS: <span className="text-white font-semibold">{changeResult.changed_pixels.toLocaleString()} px</span></div>
-                      <div>CONFIDENCE: <span className="text-emerald-300 font-semibold">{changeResult.significance_score}</span></div>
-                    </div>
                   </div>
                 )}
               </div>
             )}
+
           </div>
         )}
 
         {/* ============================================================== */}
-        {/* TAB 5: 3D POINT CLOUD & RECONSTRUCTION */}
+        {/* TAB 5: 3D POINT CLOUD VIEWER */}
         {/* ============================================================== */}
         {activeTab === "viewer3d" && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-white font-mono">3D Spatial Photogrammetry Suite</h2>
+                <h2 className="text-xl font-bold text-white font-mono">3D Point Cloud Viewer</h2>
                 <p className="text-xs text-muted-foreground">
-                  Interactive WebGL Point Cloud &amp; Terrain Relief Visualizer for {currentProject?.name}.
+                  Inspect reconstructed 3D assets and exported PLY geometry.
                 </p>
               </div>
-              <Button
-                onClick={trigger3D}
-                variant="primary"
-                size="sm"
-                isLoading={activeInferencing === "3d"}
-              >
-                Reconstruct 3D Geometry
+              <Button onClick={trigger3D} variant="primary" size="sm" isLoading={activeInferencing === "3d"}>
+                <Sparkles className="w-4 h-4 mr-1" /> Reconstruct 3D
               </Button>
             </div>
 
-<<<<<<< HEAD
-            <AdvancedSpatialViewer3D
-              projectName={currentProject?.name}
-              locationName={currentProject?.location_name}
-              initialPointCount={85000}
-=======
-            {analysisError && (
-              <div className="p-3 rounded bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs font-mono flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>{analysisError}</span>
-              </div>
-            )}
+            <Card className="glass-panel border-emerald-500/25">
+              <CardHeader className="p-4 border-b border-emerald-500/15">
+                <CardTitle className="text-sm font-bold font-mono flex items-center gap-2">
+                  <Box className="w-4 h-4 text-emerald-400" />
+                  PRIMARY 3D SPATIAL SURFACE // {currentProject?.name}
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Multi-view SfM dense point cloud and elevation relief mesh.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4">
+                <AdvancedSpatialViewer3D
+                  projectName={currentProject?.name}
+                  locationName={currentProject?.location_name}
+                  plyUrl={reconResult?.pointcloud_ply_path}
+                />
+              </CardContent>
+            </Card>
 
-            <AdvancedSpatialViewer3D
-              projectName={currentProject?.name}
-              locationName={currentProject?.location_name}
-              plyUrl={reconResult?.pointcloud_ply_path}
->>>>>>> 0400f2f (p5-udpated)
-            />
+            {reconResult &&
+              <div className="glass-panel p-4 rounded-xl border border-emerald-500/20 font-mono text-xs">
+                <h4 className="text-white font-bold mb-2">Reconstruction summary</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <span className="text-muted-foreground">Points:</span>{" "}
+                    <span className="text-white">{reconResult.num_points.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">PLY:</span>{" "}
+                    <span className="text-emerald-300 break-all">{reconResult.pointcloud_ply_path}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">OBJ:</span>{" "}
+                    <span className="text-emerald-300 break-all">{reconResult.mesh_obj_path}</span>
+                  </div>
+                </div>
+              </div>
+            }
+
+            {analysisError &&
+              <div className="p-4 rounded bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs font-mono">
+                <AlertTriangle className="w-4 h-4 inline mr-2" />
+                {analysisError}
+              </div>
+            }
           </div>
         )}
 
@@ -1190,70 +1281,58 @@ export default function DashboardPage() {
         {/* TAB 6: JOB HISTORY */}
         {/* ============================================================== */}
         {activeTab === "jobs" && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-white font-mono">Celery Distributed Task History</h2>
+                <h2 className="text-xl font-bold text-white font-mono">Job History</h2>
                 <p className="text-xs text-muted-foreground">
-                  Audit log of asynchronous vision worker execution and pipeline task IDs.
+                  Recent analysis and processing jobs for the active mission.
                 </p>
               </div>
-              <Button onClick={fetchData} variant="outline" size="sm">
-                <RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh Tasks
+              <Button variant="tactical" size="sm">
+                <RefreshCw className="w-3.5 h-3.5 mr-1" /> Refresh
               </Button>
             </div>
 
-            <div className="rounded-lg border border-emerald-500/20 overflow-hidden bg-forest-900/60 font-mono text-xs">
-              <table className="w-full text-left">
-                <thead className="bg-forest-950 text-[10px] uppercase text-muted-foreground border-b border-emerald-500/15">
-                  <tr>
-                    <th className="px-4 py-3">Task ID</th>
-                    <th className="px-4 py-3">Pipeline Type</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Progress</th>
-                    <th className="px-4 py-3">Started</th>
-                    <th className="px-4 py-3">Completed</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-emerald-500/10">
-                  {jobs.map((j) => (
-                    <tr key={j.id} className="hover:bg-forest-800/30">
-                      <td className="px-4 py-3 text-emerald-300 font-semibold">{j.celery_task_id || j.id}</td>
-                      <td className="px-4 py-3 text-white font-bold">{j.job_type}</td>
-                      <td className="px-4 py-3">
-                        {j.status === "completed" ? (
-                          <span className="inline-flex items-center gap-1 text-emerald-400 text-[11px]">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> COMPLETED
-                          </span>
-                        ) : j.status === "failed" ? (
-                          <span className="inline-flex items-center gap-1 text-rose-400 text-[11px]">
-                            <AlertTriangle className="w-3.5 h-3.5" /> FAILED
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-amber-400 text-[11px]">
-                            <Clock className="w-3.5 h-3.5 animate-spin" /> RUNNING
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="w-32 h-2 bg-forest-950 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-emerald-400 rounded-full"
-                            style={{ width: `${j.progress_pct}%` }}
-                          />
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground text-[11px]">
-                        {new Date(j.created_at).toLocaleTimeString()}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground text-[11px]">
-                        {new Date(j.updated_at).toLocaleTimeString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Card className="glass-panel border-emerald-500/20">
+              <CardHeader className="p-4 border-b border-emerald-500/15">
+                <CardTitle className="text-sm font-bold font-mono">Jobs for {currentProject?.name}</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                {jobs.length === 0 ? (
+                  <div className="text-muted-foreground text-xs">
+                    No jobs recorded for this mission yet.
+                  </div>
+                ) : (
+                  <table className="w-full text-xs font-mono text-left">
+                    <thead className="text-muted-foreground uppercase border-b border-emerald-500/15">
+                      <tr>
+                        <th className="py-2 pr-4">ID</th>
+                        <th className="py-2 pr-4">Type</th>
+                        <th className="py-2 pr-4">Status</th>
+                        <th className="py-2">Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {jobs.map((job) => (
+                        <tr key={job.id} className="border-b border-emerald-500/10">
+                          <td className="py-2 pr-4 text-emerald-300">{job.id}</td>
+                          <td className="py-2 pr-4">{job.job_type}</td>
+                          <td className="py-2 pr-4">
+                            <Badge variant={job.status === "completed" ? "success" : "warning"}>
+                              {job.status}
+                            </Badge>
+                          </td>
+                          <td className="py-2 text-muted-foreground">
+                            {new Date(job.created_at).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -1262,86 +1341,37 @@ export default function DashboardPage() {
         {/* ============================================================== */}
         {activeTab === "models" && (
           <div className="flex flex-col gap-6">
-            <div>
-              <h2 className="text-xl font-bold text-white font-mono">Neural Architecture Specifications</h2>
-              <p className="text-xs text-muted-foreground">
-                Weights, inference latency, receptive field, and tensor parameter profiles.
-              </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white font-mono">Model Information</h2>
+                <p className="text-xs text-muted-foreground">
+                  Trained model versions and inference backend details.
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="glass-panel p-5 rounded-lg border border-emerald-500/20 font-mono text-xs space-y-3">
-                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
-                  <span className="text-sm font-bold text-white flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-sky-400" />
-                    Depth Anything V2 Small (Relative)
-                  </span>
-                  <Badge variant="tactical">RELATIVE DEPTH</Badge>
-                </div>
-                <div className="space-y-1.5 text-muted-foreground text-[11px]">
-                  <div>BACKBONE: <span className="text-white">DINOv2 ViT-S/14 + DPT head</span></div>
-                  <div>PARAMETERS: <span className="text-white">24.79 Million (6.28 M trainable when fine-tuned)</span></div>
-                  <div>INPUT TENSOR: <span className="text-white">3 x 518 x 518 (RGB float32)</span></div>
-                  <div>OUTPUT: <span className="text-white">relative inverse depth (unitless)</span></div>
-                  <div>LATENCY: <span className="text-emerald-300 font-bold">~185 ms/image on CPU (378 px, measured)</span></div>
-                  <div>
-                    ACCURACY: <span className="text-amber-300">
-                      no metric claim; aligned relative AbsRel 0.071 on the held-out SkyScenes test town
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <Card className="glass-panel border-emerald-500/20">
+                <CardHeader className="p-4 border-b border-emerald-500/15">
+                  <CardTitle className="text-sm font-bold font-mono">Depth Model</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 font-mono text-xs space-y-2">
+                  <div>Model: <span className="text-white">Depth Anything V2 Small</span></div>
+                  <div>Purpose: Relative monocular depth estimation</div>
+                  <div>Metric: Relative only (no absolute scale unless calibrated)</div>
+                </CardContent>
+              </Card>
 
-              <div className="glass-panel p-5 rounded-lg border border-emerald-500/20 font-mono text-xs space-y-3">
-                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
-                  <span className="text-sm font-bold text-white flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-emerald-400" />
-                    SegFormer-B4 (Aerial LULC)
-                  </span>
-                  <Badge variant="tactical">LAND COVER</Badge>
-                </div>
-                <div className="space-y-1.5 text-muted-foreground text-[11px]">
-                  <div>BACKBONE: <span className="text-white">Mix Transformer (MiT-B4)</span></div>
-                  <div>PARAMETERS: <span className="text-white">64.1 Million</span></div>
-                  <div>CLASSES: <span className="text-white">8 LULC Categories (Cityscapes / UAV)</span></div>
-                  <div>INFERENCE LATENCY: <span className="text-emerald-300 font-bold">18.2 ms</span></div>
-                  <div>MEAN IoU: <span className="text-emerald-300">88.4% Across Validation Flight Sets</span></div>
-                </div>
-              </div>
-
-              <div className="glass-panel p-5 rounded-lg border border-emerald-500/20 font-mono text-xs space-y-3">
-                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
-                  <span className="text-sm font-bold text-white flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4 text-rose-400" />
-                    xBD Damage Siamese Classifier
-                  </span>
-                  <Badge variant="tactical">HUMANITARIAN</Badge>
-                </div>
-                <div className="space-y-1.5 text-muted-foreground text-[11px]">
-                  <div>BACKBONE: <span className="text-white">ResNeXt-101 Siamese Feature Extractor</span></div>
-                  <div>TAXONOMY: <span className="text-white">None, Minor, Major, Destroyed</span></div>
-                  <div>INPUT TENSOR: <span className="text-white">2 x 3 x 1024 x 1024 (Pre &amp; Post Pairs)</span></div>
-                  <div>INFERENCE LATENCY: <span className="text-emerald-300 font-bold">28.4 ms</span></div>
-                  <div>F1 SCORE: <span className="text-emerald-300">0.826 (xBD Disaster Response Challenge)</span></div>
-                </div>
-              </div>
-
-              <div className="glass-panel p-5 rounded-lg border border-emerald-500/20 font-mono text-xs space-y-3">
-                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
-                  <span className="text-sm font-bold text-white flex items-center gap-2">
-                    <Box className="w-4 h-4 text-cyan-400" />
-                    Open3D Multi-View SfM
-                  </span>
-                  <Badge variant="tactical">PHOTOGRAMMETRY</Badge>
-                </div>
-                <div className="space-y-1.5 text-muted-foreground text-[11px]">
-                  <div>PIPELINE: <span className="text-white">SIFT Tracking + Epipolar Bundle Adjustment</span></div>
-                  <div>DENSE STEREO: <span className="text-white">Multi-View Depth Fusion</span></div>
-                  <div>OUTPUT ASSETS: <span className="text-white">Point Cloud (.ply), Mesh (.obj), DSM (.tif)</span></div>
-                  <div>REPROJECTION ERROR: <span className="text-emerald-300 font-bold">0.78 px (Sub-pixel)</span></div>
-                  <div>POINT DENSITY: <span className="text-emerald-300">124,000+ Points / Survey Sector</span></div>
-                </div>
-              </div>
+              <Card className="glass-panel border-emerald-500/20">
+                <CardHeader className="p-4 border-b border-emerald-500/15">
+                  <CardTitle className="text-sm font-bold font-mono">Segmentation Model</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 font-mono text-xs space-y-2">
+                  <div>Model: <span className="text-white">Aerial land-cover segmenter</span></div>
+                  <div>Purpose: 7-class land-cover categorization</div>
+                  <div>Requires: Verified checkpoint for authoritative results</div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         )}
@@ -1350,167 +1380,30 @@ export default function DashboardPage() {
         {/* TAB 8: SETTINGS */}
         {/* ============================================================== */}
         {activeTab === "settings" && (
-          <div className="flex flex-col gap-6 max-w-3xl font-mono text-xs">
-            <div>
-              <h2 className="text-xl font-bold text-white">Platform Configuration &amp; Geo-Settings</h2>
-              <p className="text-xs text-muted-foreground">Adjust spatial coordinate references, worker endpoints, and hardware tuning.</p>
-            </div>
-
-            <div className="glass-panel p-6 rounded-xl border border-emerald-500/20 space-y-5">
-              <div className="space-y-1.5">
-                <label className="text-white font-semibold block">COORDINATE REFERENCE SYSTEM (CRS)</label>
-                <select
-                  value={settingsState.crs}
-                  onChange={(e) => setSettingsState({ ...settingsState, crs: e.target.value })}
-                  className="w-full bg-forest-950 border border-emerald-500/30 rounded p-2 text-emerald-300 focus:outline-none"
-                >
-                  <option>WGS84 (EPSG:4326) — Universal UAV GPS</option>
-                  <option>UTM Zone 44N (EPSG:32644) — India West / Central</option>
-                  <option>UTM Zone 45N (EPSG:32645) — India East / Coastal Odisha</option>
-                  <option>Web Mercator (EPSG:3857) — Standard Web Maps</option>
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-white font-semibold block">BACKEND API REST ENDPOINT</label>
-                <input
-                  type="text"
-                  value={settingsState.apiEndpoint}
-                  onChange={(e) => setSettingsState({ ...settingsState, apiEndpoint: e.target.value })}
-                  className="w-full bg-forest-950 border border-emerald-500/30 rounded p-2 text-white focus:outline-none"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-white font-semibold block">3D POINT CLOUD LEVEL-OF-DETAIL (LOD)</label>
-                <select
-                  value={settingsState.lodLevel}
-                  onChange={(e) => setSettingsState({ ...settingsState, lodLevel: e.target.value })}
-                  className="w-full bg-forest-950 border border-emerald-500/30 rounded p-2 text-emerald-300 focus:outline-none"
-                >
-                  <option>High (125k pts) — Desktop / Workstation</option>
-                  <option>Balanced (65k pts) — Laptop / Tablet</option>
-                  <option>Performance (25k pts) — Mobile / Low-Bandwidth</option>
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-white font-semibold block">PRIMARY 3D EXPORT FORMAT</label>
-                <select
-                  value={settingsState.exportFormat}
-                  onChange={(e) => setSettingsState({ ...settingsState, exportFormat: e.target.value })}
-                  className="w-full bg-forest-950 border border-emerald-500/30 rounded p-2 text-emerald-300 focus:outline-none"
-                >
-                  <option>PLY Point Cloud (.ply)</option>
-                  <option>Wavefront OBJ Mesh (.obj)</option>
-                  <option>Digital Surface Model GeoTIFF (.tif)</option>
-                  <option>GeoJSON Vector Footprints (.geojson)</option>
-                </select>
-              </div>
-
-              <div className="pt-2 flex items-center justify-between">
-                <span className="text-muted-foreground text-[11px]">Changes persist to browser local storage.</span>
-                <Button
-                  onClick={() => alert("Platform settings updated successfully.")}
-                  variant="primary"
-                  size="sm"
-                >
-                  Save Configuration
-                </Button>
+          <div className="flex flex-col gap-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white font-mono">Settings</h2>
+                <p className="text-xs text-muted-foreground">
+                  API configuration and environment preferences.
+                </p>
               </div>
             </div>
+
+            <Card className="glass-panel border-emerald-500/20">
+              <CardHeader className="p-4 border-b border-emerald-500/15">
+                <CardTitle className="text-sm font-bold font-mono">Environment</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 font-mono text-xs space-y-3">
+                <div>API endpoint: <span className="text-emerald-300">{settingsState.apiEndpoint}</span></div>
+                <div>CRS: <span className="text-white">{settingsState.crs}</span></div>
+                <div>Auto-refresh: <span className="text-white">{String(settingsState.autoRefresh)}</span></div>
+                <div>Export format: <span className="text-white">{settingsState.exportFormat}</span></div>
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>
-
-      {/* CREATE MISSION MODAL */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="glass-panel w-full max-w-lg p-6 rounded-xl border border-emerald-500/40 shadow-2xl relative font-mono text-xs">
-            <h3 className="text-base font-bold text-white mb-1">
-              Initialize New Aerial Mission
-            </h3>
-            <p className="text-muted-foreground text-[11px] mb-4">
-              Register a new UAV survey project in the persistent geospatial database.
-            </p>
-
-            <form onSubmit={handleCreateProject} className="space-y-3.5">
-              <div>
-                <label className="text-white block mb-1">Mission Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Mission Brahmaputra: Flood Breach Corridor"
-                  value={newProject.name}
-                  onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                  className="w-full bg-forest-950 border border-emerald-500/30 rounded p-2 text-white focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-white block mb-1">Location / Sector *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Kaziranga River Basin, Assam"
-                  value={newProject.location_name}
-                  onChange={(e) => setNewProject({ ...newProject, location_name: e.target.value })}
-                  className="w-full bg-forest-950 border border-emerald-500/30 rounded p-2 text-white focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-white block mb-1">Mission Scope Description</label>
-                <textarea
-                  rows={2}
-                  placeholder="Operational details and survey objectives..."
-                  value={newProject.description}
-                  onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-                  className="w-full bg-forest-950 border border-emerald-500/30 rounded p-2 text-white focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-white block mb-1">Center Latitude (°N)</label>
-                  <input
-                    type="number"
-                    step="0.0001"
-                    value={newProject.center_lat}
-                    onChange={(e) => setNewProject({ ...newProject, center_lat: parseFloat(e.target.value) })}
-                    className="w-full bg-forest-950 border border-emerald-500/30 rounded p-2 text-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-white block mb-1">Center Longitude (°E)</label>
-                  <input
-                    type="number"
-                    step="0.0001"
-                    value={newProject.center_lon}
-                    onChange={(e) => setNewProject({ ...newProject, center_lon: parseFloat(e.target.value) })}
-                    className="w-full bg-forest-950 border border-emerald-500/30 rounded p-2 text-white focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-emerald-500/20">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowCreateModal(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" variant="primary" size="sm">
-                  Register Mission
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-

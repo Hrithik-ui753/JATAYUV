@@ -107,7 +107,25 @@ def enqueue_full_processing(
         )
         video = db.query(Video).filter(Video.id == video_id).first()
         task_kwargs = _build_pipeline_kwargs(job, video, video_processing_config)
-        _delay_pipeline.delay(**task_kwargs)
+        try:
+            async_result = _delay_pipeline(**task_kwargs)
+        except Exception as exc:  # broker unreachable or misconfigured
+            job.status = "failed"
+            job.error_message = (
+                "Failed to enqueue processing task (is the Celery broker "
+                f"reachable?): {exc}"
+            )
+            db.commit()
+            raise RuntimeError(job.error_message) from exc
+
+        job.celery_task_id = getattr(async_result, "id", None)
+        db.refresh(job)
+        # In eager/dev mode the task runs inline and may already be terminal;
+        # never move a terminal job back to queued.
+        if job.status not in ("completed", "failed", "cancelled"):
+            job.status = "queued"
+        db.commit()
+        db.refresh(job)
         return {
             "job_id": job.id,
             "celery_task_id": job.celery_task_id,
@@ -116,6 +134,55 @@ def enqueue_full_processing(
         }
     finally:
         db.close()
+
+
+def cancel_video_processing(
+    video_id: str,
+    *,
+    db,
+    user_id: str,
+    role: str,
+) -> Dict[str, Any]:
+    """Cancel the active video-processing job for a video (cooperative)."""
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if not video:
+        raise ValueError("Video not found")
+
+    mission = db.query(Mission).filter(Mission.id == video.mission_id).first()
+    if mission is None:
+        raise ValueError("Video mission not found")
+    if role != "admin" and mission.user_id != user_id:
+        raise PermissionError("Not authorised to cancel processing for this video")
+
+    job = (
+        db.query(Job)
+        .filter(
+            Job.mission_id == video.mission_id,
+            Job.job_type == "video_processing",
+            Job.status.in_(("queued", "processing", "pending")),
+        )
+        .order_by(Job.created_at.desc())
+        .first()
+    )
+    if job is None:
+        return {"status": "no_active_job", "video_id": video_id}
+
+    if job.celery_task_id:
+        try:
+            from backend.app.workers.celery_app import celery_app
+
+            celery_app.control.revoke(job.celery_task_id, terminate=False)
+        except Exception:
+            # The database status is authoritative; workers poll it between
+            # stages. Broker failures must not block cancellation.
+            pass
+
+    job.status = "cancelled"
+    job.cancelled_at = datetime.now(timezone.utc)
+    job.error_message = "Cancelled by user"
+    db.commit()
+    JobRepository(db).add_log(job.id, "Video processing cancelled by user", level="WARN")
+    return {"status": "cancelled", "job_id": job.id, "video_id": video_id}
 
 
 def _build_pipeline_kwargs(
@@ -196,7 +263,7 @@ def get_processing_report_for_mission(
         Job.job_type == "video_processing",
     )
     if processing_run_id:
-        query = query.filter(getattr(Job, "processing_run_id", None) == processing_run_id)
+        query = query.filter(Job.processing_run_id == processing_run_id)
     jobs = query.order_by(Job.created_at.desc()).all()
     if not jobs:
         return {"error": "no_processing_found"}

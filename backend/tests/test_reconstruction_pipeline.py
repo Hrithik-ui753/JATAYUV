@@ -7,6 +7,9 @@ import pytest
 
 from backend.app.services.recon.pipeline import ReconstructionPipeline
 from backend.app.services.recon.readiness import ReconstructionReadiness
+from backend.app.models.frame import Frame
+from backend.app.models.camera_pose import CameraPose
+
 
 
 class TestReconstructionPipelineWorkspace:
@@ -81,7 +84,7 @@ class TestReconstructionReadinessWarnings:
                 def filter(self, *a, **kw):
                     return self
                 def all(self):
-                    if "selected" in str(kw):
+                    if "selected" in str(kwargs):
                         return [frame]
                     return []
                 def offset(self, *a, **kw):

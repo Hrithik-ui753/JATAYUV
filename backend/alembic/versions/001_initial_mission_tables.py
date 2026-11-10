@@ -23,13 +23,27 @@ import sqlalchemy as sa
 def _existing_indexes(table_name: str) -> set:
     conn = op.get_bind()
     rows = conn.execute(
-        sa.text("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name=:t ORDER BY name")
+        sa.text("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name=:t ORDER BY name"),
+        {"t": table_name},
     ).fetchall()
     return {r[0] for r in rows}
 
 
+
+
+def _create_table_if_missing(name, *args, **kwargs):
+    """Create a table only when it does not already exist.
+
+    Existing installations may have been provisioned by an older release (or by
+    ``create_all``) before Alembic was introduced. Re-running the chain must not
+    fail on those databases.
+    """
+    if name in sa.inspect(op.get_bind()).get_table_names():
+        return
+    op.create_table(name, *args, **kwargs)
+
 revision: str = "001_initial_mission_tables"
-down_revision: Union[str, None] = None
+down_revision: Union[str, None] = "000_base_schema"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -48,8 +62,10 @@ def _fk(name, table, ref_table, columns, ref_columns, ondelete=None):
 
 
 def upgrade() -> None:
+    existing_tables = set(sa.inspect(op.get_bind()).get_table_names())
+
     # --- missions ---
-    op.create_table(
+    _create_table_if_missing(
         "missions",
         sa.Column("id", sa.String(length=36), nullable=False),
         sa.Column("user_id", sa.String(length=36), nullable=False),
@@ -70,6 +86,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     mission_idxs = _existing_indexes("missions")
+    existing_fks = {fk.get("name") for fk in sa.inspect(op.get_bind()).get_foreign_keys("missions")}
+    existing_checks = {c.get("name") for c in sa.inspect(op.get_bind()).get_check_constraints("missions")}
     with op.batch_alter_table("missions", schema=None) as batch_op:
         if "ix_missions_status_created" not in mission_idxs:
             batch_op.create_index("ix_missions_status_created", ["status", "created_at"])
@@ -77,17 +95,18 @@ def upgrade() -> None:
             batch_op.create_index("ix_missions_user_id", ["user_id"])
         if "ix_missions_project_id" not in mission_idxs:
             batch_op.create_index("ix_missions_project_id", ["project_id"])
-        if "fk_missions_user" not in [c.name for c in batch_op.table.foreign_keys]:
+        if "fk_missions_user" not in existing_fks:
             batch_op.create_foreign_key("fk_missions_user", "users", ["user_id"], ["id"])
-        if "fk_missions_project" not in [c.name for c in batch_op.table.foreign_keys]:
+        if "fk_missions_project" not in existing_fks:
             batch_op.create_foreign_key("fk_missions_project", "projects", ["project_id"], ["id"])
-        batch_op.create_check_constraint(
-            "ck_mission_status_values",
-            "status IN ('cancelled','completed','created','failed','processing','ready','uploaded','uploading','validating')",
-        )
+        if "ck_mission_status_values" not in existing_checks:
+            batch_op.create_check_constraint(
+                "ck_mission_status_values",
+                "status IN ('cancelled','completed','created','failed','processing','ready','uploaded','uploading','validating')",
+            )
 
     # --- videos ---
-    op.create_table(
+    _create_table_if_missing(
         "videos",
         sa.Column("id", sa.String(length=36), nullable=False),
         sa.Column("mission_id", sa.String(length=36), nullable=False),
@@ -116,14 +135,15 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
-    with op.batch_alter_table("videos", schema=None) as batch_op:
-        batch_op.create_index("ix_videos_mission_id", ["mission_id"])
-        batch_op.create_index("ix_videos_created_at", ["created_at"])
-        batch_op.create_unique_constraint("uq_mission_filename", ["mission_id", "original_filename"])
-        batch_op.create_foreign_key("fk_videos_mission", "missions", ["mission_id"], ["id"], ondelete="CASCADE")
+    if "videos" not in existing_tables:
+        with op.batch_alter_table("videos", schema=None) as batch_op:
+            batch_op.create_index("ix_videos_mission_id", ["mission_id"])
+            batch_op.create_index("ix_videos_created_at", ["created_at"])
+            batch_op.create_unique_constraint("uq_mission_filename", ["mission_id", "original_filename"])
+            batch_op.create_foreign_key("fk_videos_mission", "missions", ["mission_id"], ["id"], ondelete="CASCADE")
 
     # --- flight_metadata ---
-    op.create_table(
+    _create_table_if_missing(
         "flight_metadata",
         sa.Column("id", sa.String(length=36), nullable=False),
         sa.Column("mission_id", sa.String(length=36), nullable=False),
@@ -153,14 +173,15 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
-    with op.batch_alter_table("flight_metadata", schema=None) as batch_op:
-        batch_op.create_index("ix_flight_mission_id", ["mission_id"])
-        batch_op.create_index("ix_flight_video_id", ["video_id"])
-        batch_op.create_foreign_key("fk_flight_mission", "missions", ["mission_id"], ["id"], ondelete="CASCADE")
-        batch_op.create_foreign_key("fk_flight_video", "videos", ["video_id"], ["id"], ondelete="SET NULL")
+    if "flight_metadata" not in existing_tables:
+        with op.batch_alter_table("flight_metadata", schema=None) as batch_op:
+            batch_op.create_index("ix_flight_mission_id", ["mission_id"])
+            batch_op.create_index("ix_flight_video_id", ["video_id"])
+            batch_op.create_foreign_key("fk_flight_mission", "missions", ["mission_id"], ["id"], ondelete="CASCADE")
+            batch_op.create_foreign_key("fk_flight_video", "videos", ["video_id"], ["id"], ondelete="SET NULL")
 
     # --- frames ---
-    op.create_table(
+    _create_table_if_missing(
         "frames",
         sa.Column("id", sa.String(length=36), nullable=False),
         sa.Column("mission_id", sa.String(length=36), nullable=False),
@@ -191,18 +212,19 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
-    with op.batch_alter_table("frames", schema=None) as batch_op:
-        batch_op.create_index("ix_frames_mission_id", ["mission_id"])
-        batch_op.create_index("ix_frames_video_id", ["video_id"])
-        batch_op.create_index("ix_frames_frame_index", ["frame_index"])
-        batch_op.create_index("ix_frames_presentation_timestamp", ["presentation_timestamp"])
-        batch_op.create_index("ix_frames_created_at", ["created_at"])
-        batch_op.create_unique_constraint("uq_video_frame_index", ["video_id", "frame_index"])
-        batch_op.create_foreign_key("fk_frames_mission", "missions", ["mission_id"], ["id"], ondelete="CASCADE")
-        batch_op.create_foreign_key("fk_frames_video", "videos", ["video_id"], ["id"], ondelete="CASCADE")
+    if "frames" not in existing_tables:
+        with op.batch_alter_table("frames", schema=None) as batch_op:
+            batch_op.create_index("ix_frames_mission_id", ["mission_id"])
+            batch_op.create_index("ix_frames_video_id", ["video_id"])
+            batch_op.create_index("ix_frames_frame_index", ["frame_index"])
+            batch_op.create_index("ix_frames_presentation_timestamp", ["presentation_timestamp"])
+            batch_op.create_index("ix_frames_created_at", ["created_at"])
+            batch_op.create_unique_constraint("uq_video_frame_index", ["video_id", "frame_index"])
+            batch_op.create_foreign_key("fk_frames_mission", "missions", ["mission_id"], ["id"], ondelete="CASCADE")
+            batch_op.create_foreign_key("fk_frames_video", "videos", ["video_id"], ["id"], ondelete="CASCADE")
 
     # --- camera_poses ---
-    op.create_table(
+    _create_table_if_missing(
         "camera_poses",
         sa.Column("id", sa.String(length=36), nullable=False),
         sa.Column("mission_id", sa.String(length=36), nullable=False),
@@ -229,15 +251,16 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
-    with op.batch_alter_table("camera_poses", schema=None) as batch_op:
-        batch_op.create_index("ix_camera_pose_frame_id", ["frame_id"])
-        batch_op.create_index("ix_camera_pose_mission_id", ["mission_id"])
-        batch_op.create_index("ix_camera_pose_confidence", ["confidence"])
-        batch_op.create_foreign_key("fk_pose_mission", "missions", ["mission_id"], ["id"], ondelete="CASCADE")
-        batch_op.create_foreign_key("fk_pose_frame", "frames", ["frame_id"], ["id"], ondelete="CASCADE")
+    if "camera_poses" not in existing_tables:
+        with op.batch_alter_table("camera_poses", schema=None) as batch_op:
+            batch_op.create_index("ix_camera_pose_frame_id", ["frame_id"])
+            batch_op.create_index("ix_camera_pose_mission_id", ["mission_id"])
+            batch_op.create_index("ix_camera_pose_confidence", ["confidence"])
+            batch_op.create_foreign_key("fk_pose_mission", "missions", ["mission_id"], ["id"], ondelete="CASCADE")
+            batch_op.create_foreign_key("fk_pose_frame", "frames", ["frame_id"], ["id"], ondelete="CASCADE")
 
     # --- reconstructions ---
-    op.create_table(
+    _create_table_if_missing(
         "reconstructions",
         sa.Column("id", sa.String(length=36), nullable=False),
         sa.Column("mission_id", sa.String(length=36), nullable=False),
@@ -263,14 +286,15 @@ def upgrade() -> None:
         sa.Column("completed_at", sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
-    with op.batch_alter_table("reconstructions", schema=None) as batch_op:
-        batch_op.create_index("ix_reconstructions_mission_id", ["mission_id"])
-        batch_op.create_index("ix_reconstructions_status", ["status"])
-        batch_op.create_index("ix_reconstructions_created_at", ["created_at"])
-        batch_op.create_foreign_key("fk_reconstructions_mission", "missions", ["mission_id"], ["id"], ondelete="CASCADE")
+    if "reconstructions" not in existing_tables:
+        with op.batch_alter_table("reconstructions", schema=None) as batch_op:
+            batch_op.create_index("ix_reconstructions_mission_id", ["mission_id"])
+            batch_op.create_index("ix_reconstructions_status", ["status"])
+            batch_op.create_index("ix_reconstructions_created_at", ["created_at"])
+            batch_op.create_foreign_key("fk_reconstructions_mission", "missions", ["mission_id"], ["id"], ondelete="CASCADE")
 
     # --- georef_solutions ---
-    op.create_table(
+    _create_table_if_missing(
         "georef_solutions",
         sa.Column("id", sa.String(length=36), nullable=False),
         sa.Column("mission_id", sa.String(length=36), nullable=False),
@@ -290,14 +314,15 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
-    with op.batch_alter_table("georef_solutions", schema=None) as batch_op:
-        batch_op.create_index("ix_georef_mission_id", ["mission_id"])
-        batch_op.create_index("ix_georef_reconstruction_id", ["reconstruction_id"])
-        batch_op.create_foreign_key("fk_georef_mission", "missions", ["mission_id"], ["id"], ondelete="CASCADE")
-        batch_op.create_foreign_key("fk_georef_reconstruction", "reconstructions", ["reconstruction_id"], ["id"], ondelete="SET NULL")
+    if "georef_solutions" not in existing_tables:
+        with op.batch_alter_table("georef_solutions", schema=None) as batch_op:
+            batch_op.create_index("ix_georef_mission_id", ["mission_id"])
+            batch_op.create_index("ix_georef_reconstruction_id", ["reconstruction_id"])
+            batch_op.create_foreign_key("fk_georef_mission", "missions", ["mission_id"], ["id"], ondelete="CASCADE")
+            batch_op.create_foreign_key("fk_georef_reconstruction", "reconstructions", ["reconstruction_id"], ["id"], ondelete="SET NULL")
 
     # --- validation_reports ---
-    op.create_table(
+    _create_table_if_missing(
         "validation_reports",
         sa.Column("id", sa.String(length=36), nullable=False),
         sa.Column("mission_id", sa.String(length=36), nullable=False),
@@ -321,31 +346,46 @@ def upgrade() -> None:
         sa.Column("generated_at", sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
-    with op.batch_alter_table("validation_reports", schema=None) as batch_op:
-        batch_op.create_index("ix_validation_mission_id", ["mission_id"])
-        batch_op.create_index("ix_validation_reconstruction_id", ["reconstruction_id"])
-        batch_op.create_index("ix_validation_generated_at", ["generated_at"])
-        batch_op.create_foreign_key("fk_validation_mission", "missions", ["mission_id"], ["id"], ondelete="CASCADE")
-        batch_op.create_foreign_key("fk_validation_reconstruction", "reconstructions", ["reconstruction_id"], ["id"], ondelete="SET NULL")
+    if "validation_reports" not in existing_tables:
+        with op.batch_alter_table("validation_reports", schema=None) as batch_op:
+            batch_op.create_index("ix_validation_mission_id", ["mission_id"])
+            batch_op.create_index("ix_validation_reconstruction_id", ["reconstruction_id"])
+            batch_op.create_index("ix_validation_generated_at", ["generated_at"])
+            batch_op.create_foreign_key("fk_validation_mission", "missions", ["mission_id"], ["id"], ondelete="CASCADE")
+            batch_op.create_foreign_key("fk_validation_reconstruction", "reconstructions", ["reconstruction_id"], ["id"], ondelete="SET NULL")
 
     # --- extend existing jobs table additively (preserve data, no drops) ---
+    insp = sa.inspect(op.get_bind())
+    job_cols = {c["name"] for c in insp.get_columns("jobs")}
+    job_indexes = {i["name"] for i in insp.get_indexes("jobs")}
+    job_fks = insp.get_foreign_keys("jobs")
+    has_mission_fk = any(fk.get("constrained_columns") == ["mission_id"] for fk in job_fks)
     with op.batch_alter_table("jobs", schema=None) as batch_op:
-        batch_op.add_column(sa.Column("mission_id", sa.String(length=36), nullable=True))
-        batch_op.add_column(sa.Column("stage", sa.String(length=64), nullable=True))
-        batch_op.create_index("ix_jobs_mission_id", ["mission_id"])
-        batch_op.create_foreign_key("fk_jobs_mission", "missions", ["mission_id"], ["id"], ondelete="SET NULL")
+        if "mission_id" not in job_cols:
+            batch_op.add_column(sa.Column("mission_id", sa.String(length=36), nullable=True))
+        if "stage" not in job_cols:
+            batch_op.add_column(sa.Column("stage", sa.String(length=64), nullable=True))
+        if "ix_jobs_mission_id" not in job_indexes:
+            batch_op.create_index("ix_jobs_mission_id", ["mission_id"])
+        if not has_mission_fk:
+            batch_op.create_foreign_key("fk_jobs_mission", "missions", ["mission_id"], ["id"], ondelete="SET NULL")
 
 
 def downgrade() -> None:
     # Reverse in dependency order.
+    insp = sa.inspect(op.get_bind())
+    job_constraints = {fk.get("name") for fk in insp.get_foreign_keys("jobs")}
+    job_indexes = {i["name"] for i in insp.get_indexes("jobs")}
+    job_cols = {c["name"] for c in insp.get_columns("jobs")}
     with op.batch_alter_table("jobs", schema=None) as batch_op:
-        existing_jobs_constraints = {c.name for c in batch_op.table.foreign_keys}
-        if "fk_jobs_mission" in existing_jobs_constraints:
+        if "fk_jobs_mission" in job_constraints:
             batch_op.drop_constraint("fk_jobs_mission", type_="foreignkey")
-        if "ix_jobs_mission_id" in [i.name for i in batch_op.table.indexes]:
+        if "ix_jobs_mission_id" in job_indexes:
             batch_op.drop_index("ix_jobs_mission_id")
-        batch_op.drop_column("stage")
-        batch_op.drop_column("mission_id")
+        if "stage" in job_cols:
+            batch_op.drop_column("stage")
+        if "mission_id" in job_cols:
+            batch_op.drop_column("mission_id")
 
     op.drop_table("validation_reports")
     op.drop_table("georef_solutions")

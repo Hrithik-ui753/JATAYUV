@@ -10,6 +10,7 @@ from __future__ import annotations
 from sqlalchemy import (
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -19,7 +20,21 @@ from sqlalchemy import (
     Table,
     Text,
 )
+import sqlalchemy as sa
 from alembic import op
+
+# 
+
+def _create_table_if_missing(name, *args, **kwargs):
+    """Create a table only when it does not already exist.
+
+    Existing installations may have been provisioned by an older release (or by
+    ``create_all``) before Alembic was introduced. Re-running the chain must not
+    fail on those databases.
+    """
+    if name in sa.inspect(op.get_bind()).get_table_names():
+        return
+    op.create_table(name, *args, **kwargs)
 
 # revision identifiers, used by Alembic.
 revision = "003_p3_perception_tables"
@@ -32,7 +47,7 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # PerceptionRun
     # ------------------------------------------------------------------
-    op.create_table(
+    _create_table_if_missing(
         "perception_runs",
         Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
         Column("mission_id", String(36), ForeignKey("missions.id", ondelete="CASCADE"), nullable=False),
@@ -69,13 +84,13 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # FramePerception
     # ------------------------------------------------------------------
-    op.create_table(
+    _create_table_if_missing(
         "frame_perceptions",
         Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
         Column("perception_run_id", String(36), ForeignKey("perception_runs.id", ondelete="CASCADE"), nullable=False),
         Column("frame_id", String(36), ForeignKey("frames.id", ondelete="CASCADE"), nullable=False),
         Column("status", String(32), nullable=False, server_default=op.inline_literal("pending")),
-        Column("processing_duration_seconds", op.sqlalchemy.Float(asdecimal=False), nullable=True),
+        Column("processing_duration_seconds", Float(asdecimal=False), nullable=True),
         Column("error_message", Text, nullable=True),
         Column("warnings_json", JSON, nullable=True),
         Column("created_at", DateTime, nullable=False),
@@ -86,7 +101,7 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # FrameDepthResult
     # ------------------------------------------------------------------
-    op.create_table(
+    _create_table_if_missing(
         "frame_depth_results",
         Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
         Column("frame_perception_id", String(36), ForeignKey("frame_perceptions.id", ondelete="CASCADE"), nullable=False),
@@ -101,17 +116,17 @@ def upgrade() -> None:
         Column("output_width", Integer, nullable=True),
         Column("output_height", Integer, nullable=True),
         Column("inference_device", String(32), nullable=True),
-        Column("inference_duration_ms", op.sqlalchemy.Float(asdecimal=False), nullable=True),
+        Column("inference_duration_ms", Float(asdecimal=False), nullable=True),
         Column("preprocessing_json", JSON, nullable=True),
         Column("depth_type", String(32), nullable=True),
         Column("depth_unit", String(64), nullable=True),
         Column("is_metric", Integer, nullable=True),
-        Column("depth_min", op.sqlalchemy.Float(asdecimal=False), nullable=True),
-        Column("depth_max", op.sqlalchemy.Float(asdecimal=False), nullable=True),
-        Column("depth_mean", op.sqlalchemy.Float(asdecimal=False), nullable=True),
-        Column("relative_min", op.sqlalchemy.Float(asdecimal=False), nullable=True),
-        Column("relative_max", op.sqlalchemy.Float(asdecimal=False), nullable=True),
-        Column("relative_mean", op.sqlalchemy.Float(asdecimal=False), nullable=True),
+        Column("depth_min", Float(asdecimal=False), nullable=True),
+        Column("depth_max", Float(asdecimal=False), nullable=True),
+        Column("depth_mean", Float(asdecimal=False), nullable=True),
+        Column("relative_min", Float(asdecimal=False), nullable=True),
+        Column("relative_max", Float(asdecimal=False), nullable=True),
+        Column("relative_mean", Float(asdecimal=False), nullable=True),
         Column("confidence_json", JSON, nullable=True),
         Column("created_at", DateTime, nullable=False),
     )
@@ -120,7 +135,7 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # FrameSegmentationResult
     # ------------------------------------------------------------------
-    op.create_table(
+    _create_table_if_missing(
         "frame_segmentation_results",
         Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
         Column("frame_perception_id", String(36), ForeignKey("frame_perceptions.id", ondelete="CASCADE"), nullable=False),
@@ -134,7 +149,7 @@ def upgrade() -> None:
         Column("output_width", Integer, nullable=True),
         Column("output_height", Integer, nullable=True),
         Column("inference_device", String(32), nullable=True),
-        Column("inference_duration_ms", op.sqlalchemy.Float(asdecimal=False), nullable=True),
+        Column("inference_duration_ms", Float(asdecimal=False), nullable=True),
         Column("preprocessing_json", JSON, nullable=True),
         Column("class_distribution_json", JSON, nullable=False),
         Column("per_class_pixel_counts_json", JSON, nullable=False),
@@ -145,7 +160,7 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # FrameDynamicObjectResult
     # ------------------------------------------------------------------
-    op.create_table(
+    _create_table_if_missing(
         "frame_dynamic_object_results",
         Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
         Column("frame_perception_id", String(36), ForeignKey("frame_perceptions.id", ondelete="CASCADE"), nullable=False),
@@ -155,7 +170,7 @@ def upgrade() -> None:
         Column("model_version", String(100), nullable=True),
         Column("checkpoint_sha256", String(64), nullable=True),
         Column("inference_device", String(32), nullable=True),
-        Column("inference_duration_ms", op.sqlalchemy.Float(asdecimal=False), nullable=True),
+        Column("inference_duration_ms", Float(asdecimal=False), nullable=True),
         Column("preprocessing_json", JSON, nullable=True),
         Column("dynamic_label_policy", String(64), nullable=True),
         Column("created_at", DateTime, nullable=False),
@@ -164,7 +179,7 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # PerceptionArtifact
     # ------------------------------------------------------------------
-    op.create_table(
+    _create_table_if_missing(
         "perception_artifacts",
         Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
         Column("perception_run_id", String(36), ForeignKey("perception_runs.id", ondelete="CASCADE"), nullable=False),

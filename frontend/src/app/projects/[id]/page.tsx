@@ -1,10 +1,6 @@
 "use client";
 
-<<<<<<< HEAD
-import React, { useState, useEffect } from "react";
-=======
 import React, { useCallback, useEffect, useMemo, useState } from "react";
->>>>>>> 0400f2f (p5-udpated)
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
@@ -12,30 +8,10 @@ import {
   Layers,
   ShieldAlert,
   Box,
-<<<<<<< HEAD
-  UploadCloud,
-  FileDown,
-=======
->>>>>>> 0400f2f (p5-udpated)
   Sparkles,
   ArrowLeft,
   Camera,
   MapPin,
-<<<<<<< HEAD
-  Clock,
-  Play,
-  RotateCw,
-  Sliders,
-  CheckCircle2,
-  AlertCircle,
-  GitCompare,
-  Activity,
-  Download
-} from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
-=======
   Activity,
   AlertTriangle,
   GitCompare,
@@ -44,13 +20,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
->>>>>>> 0400f2f (p5-udpated)
 import { BeforeAfterSlider } from "@/components/viewer/BeforeAfterSlider";
 import { DepthViewer } from "@/components/viewer/DepthViewer";
 import { api } from "@/lib/api";
 import { Project, AerialImage } from "@/types";
-<<<<<<< HEAD
-=======
 import type {
   ChangeDetectionResult,
   DamageAssessmentResult,
@@ -58,7 +31,6 @@ import type {
   Reconstruction3DResult,
   SegmentationResult,
 } from "@/types";
->>>>>>> 0400f2f (p5-udpated)
 
 const AdvancedSpatialViewer3D = dynamic(
   () =>
@@ -69,18 +41,12 @@ const AdvancedSpatialViewer3D = dynamic(
     ssr: false,
     loading: () => (
       <div className="h-[620px] w-full bg-forest-950 flex flex-col items-center justify-center gap-2 border border-emerald-500/20 rounded-xl font-mono text-xs text-emerald-400">
-<<<<<<< HEAD
-        <span>INITIALIZING 3D SPATIAL RECONSTRUCTION...</span>
-=======
         <span>INITIALIZING 3D VIEWER…</span>
->>>>>>> 0400f2f (p5-udpated)
       </div>
     ),
   }
 );
 
-<<<<<<< HEAD
-=======
 /** Empty state used wherever no verified result exists yet. */
 function NoVerifiedResult({ label }: { label: string }) {
   return (
@@ -94,7 +60,6 @@ function NoVerifiedResult({ label }: { label: string }) {
   );
 }
 
->>>>>>> 0400f2f (p5-udpated)
 export default function ProjectWorkspacePage({ params }: { params: { id: string } }) {
   const [project, setProject] = useState<Project | null>(null);
   const [images, setImages] = useState<AerialImage[]>([]);
@@ -103,8 +68,6 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
     "imagery" | "depth" | "segmentation" | "damage" | "change" | "3d"
   >("3d");
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-<<<<<<< HEAD
-=======
   const [pageError, setPageError] = useState<string | null>(null);
 
   const [reconResult, setReconResult] = useState<Reconstruction3DResult | null>(null);
@@ -122,7 +85,6 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
       setReconResult(null);
     }
   }, [params.id]);
->>>>>>> 0400f2f (p5-udpated)
 
   useEffect(() => {
     const load = async () => {
@@ -132,30 +94,14 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
         setProject(p);
         const imgs = await api.getProjectImages(params.id);
         setImages(imgs);
-<<<<<<< HEAD
-      } catch (err) {
-        console.error(err);
-=======
         await loadResults();
       } catch (err: any) {
         setPageError(err?.message ?? "Failed to load mission data");
->>>>>>> 0400f2f (p5-udpated)
       } finally {
         setLoading(false);
       }
     };
     load();
-<<<<<<< HEAD
-  }, [params.id]);
-
-  const handleRunInference = (taskName: string) => {
-    setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-    }, 1200);
-  };
-
-=======
   }, [params.id, loadResults]);
 
   const preImage = images[0] ?? null;
@@ -222,7 +168,6 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
     { id: "imagery", label: "Ingested Imagery", icon: Camera },
   ] as const;
 
->>>>>>> 0400f2f (p5-udpated)
   return (
     <div className="flex-1 flex flex-col gap-6 p-6 sm:p-8 max-w-7xl mx-auto w-full font-mono text-xs">
       {/* Top Breadcrumb & Project Header */}
@@ -235,37 +180,25 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
             <ArrowLeft className="w-3.5 h-3.5" /> Back to Survey Missions
           </Link>
           <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
-<<<<<<< HEAD
-            {project?.name || "Loading Mission..."}
-=======
             {project?.name || (loading ? "Loading Mission…" : "Mission")}
->>>>>>> 0400f2f (p5-udpated)
             <Badge variant="success" className="text-[10px]">
               Active Session
             </Badge>
           </h1>
           <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground mt-1">
             <span className="flex items-center gap-1">
-<<<<<<< HEAD
-              <MapPin className="w-3.5 h-3.5 text-emerald-400" /> {project?.location_name || "Location Unspecified"}
-=======
               <MapPin className="w-3.5 h-3.5 text-emerald-400" />{" "}
               {project?.location_name || "Location Unspecified"}
->>>>>>> 0400f2f (p5-udpated)
             </span>
             <span>•</span>
             <span className="flex items-center gap-1">
               <Camera className="w-3.5 h-3.5 text-emerald-400" /> {images.length} Captures
             </span>
             <span>•</span>
-<<<<<<< HEAD
-            <span>Created {project?.created_at ? new Date(project.created_at).toLocaleDateString() : ""}</span>
-=======
             <span>
               Created{" "}
               {project?.created_at ? new Date(project.created_at).toLocaleDateString() : ""}
             </span>
->>>>>>> 0400f2f (p5-udpated)
           </div>
         </div>
 
@@ -278,18 +211,6 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
         </div>
       </div>
 
-<<<<<<< HEAD
-      {/* Workspace Navigation Tabs */}
-      <div className="flex items-center gap-1 border-b border-emerald-500/20 pb-1 overflow-x-auto text-xs">
-        {[
-          { id: "3d", label: "3D Photogrammetry", icon: Box },
-          { id: "damage", label: "Damage Assessment (xBD)", icon: ShieldAlert },
-          { id: "depth", label: "Monocular Depth", icon: Activity },
-          { id: "segmentation", label: "Land-Cover Segmentation", icon: Layers },
-          { id: "change", label: "Change Detection", icon: GitCompare },
-          { id: "imagery", label: "Ingested Imagery", icon: Camera },
-        ].map((tab) => {
-=======
       {pageError && (
         <div className="p-3 rounded bg-rose-950/60 border border-rose-500/40 text-rose-300 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -308,7 +229,6 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
       {/* Workspace Navigation Tabs */}
       <div className="flex items-center gap-1 border-b border-emerald-500/20 pb-1 overflow-x-auto text-xs">
         {tabs.map((tab) => {
->>>>>>> 0400f2f (p5-udpated)
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
@@ -335,17 +255,6 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-white font-bold text-sm">
-<<<<<<< HEAD
-                HIGH-DENSITY STRUCTURE FROM MOTION (SfM) POINT CLOUD
-              </span>
-              <Button
-                onClick={() => handleRunInference("3D")}
-                variant="primary"
-                size="sm"
-                isLoading={isProcessing}
-              >
-                Re-Run Triangulation
-=======
                 PHOTOGRAMMETRY POINT CLOUD (COLMAP)
               </span>
               <Button
@@ -361,17 +270,12 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
                 }
               >
                 <Sparkles className="w-3.5 h-3.5 mr-1" /> Run Reconstruction
->>>>>>> 0400f2f (p5-udpated)
               </Button>
             </div>
 
             <AdvancedSpatialViewer3D
               projectName={project?.name}
               locationName={project?.location_name}
-<<<<<<< HEAD
-              initialPointCount={85000}
-            />
-=======
               plyUrl={reconResult?.pointcloud_ply_path}
             />
 
@@ -402,7 +306,6 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
                 </div>
               </div>
             )}
->>>>>>> 0400f2f (p5-udpated)
           </div>
         )}
 
@@ -411,16 +314,6 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
           <div className="glass-panel p-6 rounded-xl border border-emerald-500/25 space-y-5">
             <div className="flex items-center justify-between">
               <div>
-<<<<<<< HEAD
-                <h3 className="text-base font-bold text-white">xBD Humanitarian Damage Assessment</h3>
-                <p className="text-muted-foreground text-xs">Pre- vs Post-Disaster aerial flight differencing.</p>
-              </div>
-              <Button
-                onClick={() => handleRunInference("Damage")}
-                variant="primary"
-                size="sm"
-                isLoading={isProcessing}
-=======
                 <h3 className="text-base font-bold text-white">xBD Building Damage Assessment</h3>
                 <p className="text-muted-foreground text-xs">
                   Pre- vs post-disaster aerial comparison. Requires a verified damage checkpoint.
@@ -432,39 +325,11 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
                 size="sm"
                 isLoading={isProcessing}
                 disabled={!preImage || !postImage}
->>>>>>> 0400f2f (p5-udpated)
               >
                 Execute Analysis
               </Button>
             </div>
 
-<<<<<<< HEAD
-            <BeforeAfterSlider
-              beforeImage="https://images.unsplash.com/photo-1508873696983-2df5293cb32f?auto=format&fit=crop&w=1200&q=80"
-              afterImage="https://images.unsplash.com/photo-1547683905-f686c993aae5?auto=format&fit=crop&w=1200&q=80"
-              beforeLabel="Pre-Event Baseline Survey"
-              afterLabel="Post-Event Survey // xBD Neural Triage"
-            />
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
-                <div className="text-[10px] text-muted-foreground">NO DAMAGE</div>
-                <div className="text-emerald-400 font-bold text-base mt-0.5">52 Buildings</div>
-              </div>
-              <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
-                <div className="text-[10px] text-muted-foreground">MINOR DAMAGE</div>
-                <div className="text-amber-300 font-bold text-base mt-0.5">64 Buildings</div>
-              </div>
-              <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
-                <div className="text-[10px] text-muted-foreground">MAJOR DAMAGE</div>
-                <div className="text-orange-400 font-bold text-base mt-0.5">86 Buildings</div>
-              </div>
-              <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
-                <div className="text-[10px] text-muted-foreground">DESTROYED</div>
-                <div className="text-rose-400 font-bold text-base mt-0.5">46 Buildings</div>
-              </div>
-            </div>
-=======
             {damageResult ? (
               <>
                 {preImage && postImage && (
@@ -516,7 +381,6 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
             ) : (
               <NoVerifiedResult label="damage assessment" />
             )}
->>>>>>> 0400f2f (p5-udpated)
           </div>
         )}
 
@@ -525,32 +389,6 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
           <div className="glass-panel p-6 rounded-xl border border-emerald-500/25 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-<<<<<<< HEAD
-                <h3 className="text-base font-bold text-white">Depth Anything V2 Small — Monocular Depth</h3>
-                <p className="text-muted-foreground text-xs">
-                  Relative inverse-depth map and relief extraction (no metric scale unless calibrated).
-                </p>
-              </div>
-              <Button
-                onClick={() => handleRunInference("Depth")}
-                variant="primary"
-                size="sm"
-                isLoading={isProcessing}
-              >
-                Re-Estimate Depth
-              </Button>
-            </div>
-
-            <DepthViewer
-              originalImage="https://images.unsplash.com/photo-1508873696983-2df5293cb32f?auto=format&fit=crop&w=1200&q=80"
-              depthMapUrl="https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=1200&q=80"
-              relativeMin={0.02}
-              relativeMax={0.97}
-              relativeMean={0.41}
-              depthType="relative"
-              modelLabel="Depth Anything V2 Small"
-            />
-=======
                 <h3 className="text-base font-bold text-white">
                   Depth Anything V2 Small — Monocular Depth
                 </h3>
@@ -585,33 +423,12 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
             ) : (
               <NoVerifiedResult label="depth estimation" />
             )}
->>>>>>> 0400f2f (p5-udpated)
           </div>
         )}
 
         {/* 4. SEGMENTATION TAB */}
         {activeTab === "segmentation" && (
           <div className="glass-panel p-6 rounded-xl border border-emerald-500/25 space-y-4">
-<<<<<<< HEAD
-            <h3 className="text-base font-bold text-white">8-Class Land Use &amp; Land Cover Segmentation</h3>
-            <div className="relative rounded-lg overflow-hidden border border-emerald-500/30 aspect-video">
-              <img
-                src="https://images.unsplash.com/photo-1508873696983-2df5293cb32f?auto=format&fit=crop&w=1200&q=80"
-                alt="Segmentation"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-tr from-emerald-900/40 via-purple-900/30 to-blue-900/30 mix-blend-overlay pointer-events-none" />
-            </div>
-            <div className="flex justify-between items-center text-muted-foreground">
-              <span>IoU: 88.4% Across All Classes</span>
-              <button
-                onClick={() => alert("GeoJSON building footprints exported.")}
-                className="text-emerald-400 font-bold hover:underline flex items-center gap-1"
-              >
-                <Download className="w-3.5 h-3.5" /> Download GeoJSON
-              </button>
-            </div>
-=======
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-white">
@@ -665,22 +482,12 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
             ) : (
               <NoVerifiedResult label="segmentation" />
             )}
->>>>>>> 0400f2f (p5-udpated)
           </div>
         )}
 
         {/* 5. CHANGE TAB */}
         {activeTab === "change" && (
           <div className="glass-panel p-6 rounded-xl border border-emerald-500/25 space-y-4">
-<<<<<<< HEAD
-            <h3 className="text-base font-bold text-white">Bi-Temporal Divergence Heatmap</h3>
-            <BeforeAfterSlider
-              beforeImage="https://images.unsplash.com/photo-1508873696983-2df5293cb32f?auto=format&fit=crop&w=1200&q=80"
-              afterImage="https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=1200&q=80"
-              beforeLabel="Flight Baseline T0"
-              afterLabel="Divergence Heatmap T1"
-            />
-=======
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-white">Bi-Temporal Divergence</h3>
@@ -729,7 +536,6 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
             ) : (
               <NoVerifiedResult label="change detection" />
             )}
->>>>>>> 0400f2f (p5-udpated)
           </div>
         )}
 
@@ -737,26 +543,6 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
         {activeTab === "imagery" && (
           <div className="space-y-4">
             <h3 className="text-base font-bold text-white">Ingested UAV Survey Imagery</h3>
-<<<<<<< HEAD
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {images.map((img) => (
-                <div key={img.id} className="glass-panel p-4 rounded-lg border border-emerald-500/20 flex gap-4">
-                  <div className="w-36 h-28 rounded overflow-hidden shrink-0 bg-forest-950 border border-emerald-500/20">
-                    <img src={img.thumbnail_path} alt={img.filename} className="w-full h-full object-cover" />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-white font-bold">{img.filename}</div>
-                    <div className="text-muted-foreground">{img.width}x{img.height} px</div>
-                    {img.telemetry && (
-                      <div className="text-[10px] text-emerald-300">
-                        {img.telemetry.camera_model} | {img.telemetry.altitude_m}m AGL
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-=======
             {images.length === 0 ? (
               <NoVerifiedResult label="uploaded aerial" />
             ) : (
@@ -788,7 +574,6 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
                 ))}
               </div>
             )}
->>>>>>> 0400f2f (p5-udpated)
           </div>
         )}
       </div>

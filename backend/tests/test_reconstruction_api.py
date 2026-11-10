@@ -2,6 +2,7 @@ import os
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.app.api.v1.reconstruction import router, _get_mission_or_404
@@ -18,11 +19,16 @@ def _fake_user():
     return u
 
 
-class TestReconstructionAPI:
-    def test_start_requires_mission_ownership(self, monkeypatch):
-        client = TestClient(router)
-        monkeypatch.setattr(get_current_active_user, lambda: _fake_user())
+@pytest.fixture
+def client():
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_current_active_user] = _fake_user
+    return TestClient(app)
 
+
+class TestReconstructionAPI:
+    def test_start_requires_mission_ownership(self, monkeypatch, client):
         mission = MagicMock()
         mission.id = "mission-1"
         mission.user_id = "user-2"
@@ -32,10 +38,7 @@ class TestReconstructionAPI:
         response = client.post("/api/v1/missions/mission-1/reconstruction/start")
         assert response.status_code == 403
 
-    def test_start_returns_409_when_not_ready(self, monkeypatch):
-        client = TestClient(router)
-        monkeypatch.setattr(get_current_active_user, lambda: _fake_user())
-
+    def test_start_returns_409_when_not_ready(self, monkeypatch, client):
         mission = MagicMock()
         mission.id = "mission-1"
         mission.user_id = "user-1"
@@ -47,10 +50,7 @@ class TestReconstructionAPI:
         response = client.post("/api/v1/missions/mission-1/reconstruction/start")
         assert response.status_code == 409
 
-    def test_status_returns_404_when_no_run(self, monkeypatch):
-        client = TestClient(router)
-        monkeypatch.setattr(get_current_active_user, lambda: _fake_user())
-
+    def test_status_returns_404_when_no_run(self, monkeypatch, client):
         mission = MagicMock()
         mission.id = "mission-1"
         mission.user_id = "user-1"
@@ -61,10 +61,7 @@ class TestReconstructionAPI:
         response = client.get("/api/v1/missions/mission-1/reconstruction/status")
         assert response.status_code == 404
 
-    def test_point_cloud_endpoint_returns_404_when_artifact_missing(self, monkeypatch):
-        client = TestClient(router)
-        monkeypatch.setattr(get_current_active_user, lambda: _fake_user())
-
+    def test_point_cloud_endpoint_returns_404_when_artifact_missing(self, monkeypatch, client):
         rec = MagicMock()
         rec.id = "rec-1"
         rec.mission_id = "mission-1"
@@ -76,3 +73,4 @@ class TestReconstructionAPI:
 
         response = client.get("/api/v1/reconstructions/rec-1/point-cloud")
         assert response.status_code == 404
+

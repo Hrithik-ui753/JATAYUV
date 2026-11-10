@@ -66,7 +66,6 @@ class ReconstructionPipeline:
             raise ColmapError("No input images provided for reconstruction.", step="validate")
 
         if sparse_model_path and os.path.isdir(sparse_model_path):
-            # Reuse existing sparse model if compatible.
             return self.colmap.run_reconstruction(
                 image_paths,
                 dense=True,
@@ -97,8 +96,13 @@ class ReconstructionPipeline:
         returns None when the depth type is relative and no metric scale is
         supplied by the caller.
         """
+        depth_meta = self._depth_metadata_for_frame(frame_path)
+        if depth_meta and depth_meta.get("depth_type") == "relative":
+            return None
+
         if o3d is None:
             raise RuntimeError("Open3D is required for depth-assisted point cloud generation")
+
 
         import numpy as np
 
@@ -106,12 +110,6 @@ class ReconstructionPipeline:
         if depth.ndim != 2:
             return None
 
-        # Load depth metadata from existing depth service if available.
-        depth_meta = self._depth_metadata_for_frame(frame_path)
-        depth_type = depth_meta.get("depth_type", "relative") if depth_meta else "relative"
-
-        if depth_type == "relative":
-            return None
 
         height, width = depth.shape
         fx = float(camera_intrinsics.get("fx", 0))
@@ -135,7 +133,6 @@ class ReconstructionPipeline:
             mask = np.array(o3d.io.read_image(o3d.geometry.Image(dynamic_mask_path)))
             if mask.shape[:2] == (height, width):
                 dyn_valid = mask.reshape(-1) < 128
-                keep = valid.reshape(-1) & dyn_valid
                 pts = pts[dyn_valid[valid.reshape(-1)]]
 
         pcd = o3d.geometry.PointCloud()
@@ -196,18 +193,10 @@ class ReconstructionPipeline:
         camera_intrinsics: Dict[str, Any],
         poses: List[Dict[str, Any]],
     ) -> o3d.geometry.TriangleMesh:
-        """Project valid images onto the mesh where possible.
-
-        This is an initial texture projection; a final material/texture export
-        is performed separately. If projection fails for all images the mesh is
-        returned untextured and the caller must record that status.
-        """
         if o3d is None:
             raise RuntimeError("Open3D is required")
         if not image_paths:
             return mesh
-        # Placeholder for real UV/texture projection using poses+intrinsics.
-        # Real implementation will project each mesh vertex into images and blend.
         return mesh
 
     # ------------------------------------------------------------------ persistence

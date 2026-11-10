@@ -99,6 +99,7 @@ def infer_depth(
         normalized_vis = _normalize_visualization(raw)
         vis_image = _make_visualization_image(normalized_vis)
 
+        h, w = frame_bgr.shape[:2]
         return DepthInferenceResult(
             depth_map_path=depth_path,
             depth_visualization_path=colormap_path,
@@ -106,13 +107,13 @@ def infer_depth(
             model_id=metadata["model_id"],
             model_version=metadata["model_version"],
             checkpoint_sha256=metadata["checkpoint_sha256"],
-            depth_type=metadata["depth_type"],
-            depth_unit=metadata["depth_unit"],
-            is_metric=metadata["is_metric"],
+            depth_type=metadata.get("depth_type", "relative"),
+            depth_unit="relative_inverse_depth",
+            is_metric=False,
             input_width=input_size or 518,
             input_height=input_size or 518,
-            output_width=int(raw.shape[1]),
-            output_height=int(raw.shape[0]),
+            output_width=w,
+            output_height=h,
             inference_device=metadata["device"],
             inference_duration_ms=float(metadata["inference_ms"]),
             preprocessing_json={
@@ -140,13 +141,39 @@ def infer_depth(
 
 
 def is_depth_available(model_id: Optional[str] = None) -> bool:
-    service = DepthEstimationService(model_id=model_id)
-    models = service.available_models()
-    spec = service.get_engine(model_id=model_id).spec
-    return bool(spec.checkpoint) and os.path.isfile(spec.checkpoint)
+    try:
+        service = DepthEstimationService(model_id=model_id)
+        spec = service.get_engine(model_id=model_id).spec
+        return bool(spec.checkpoint) and os.path.isfile(spec.checkpoint)
+    except Exception:
+        return False
 
 
 def describe_depth_model() -> Dict[str, Any]:
-    from backend.app.services.perception import describe_depth_model as _describe
+    try:
+        service = DepthEstimationService()
+        spec = service.get_engine().spec
+        available = bool(spec.checkpoint) and os.path.isfile(spec.checkpoint)
+        model_id = spec.model_id
+        label = spec.label
+        version = spec.version
+        ckpt = spec.checkpoint
+    except Exception:
+        available = False
+        ckpt = None
+        model_id = "depth_anything_v2_small"
+        label = "Depth Anything V2 Small"
+        version = "2.0.0"
 
-    return _describe()
+    return {
+        "model_id": model_id,
+        "model_name": label,
+        "version": version,
+        "depth_type": "relative",
+        "is_metric": False,
+        "depth_unit": "relative_inverse_depth",
+        "checkpoint_available": available,
+        "checkpoint_path": ckpt,
+        "status": "available" if available else "unavailable",
+    }
+

@@ -50,8 +50,4 @@ class CheckpointObservation(Base):
     georef_processing_run = relationship("GeorefProcessingRun", backref="checkpoint_observations")
     gcp = relationship("GroundControlPoint", backref="checkpoint_observations")
 
-    __table_args__ = (
-        Index("ix_checkpoint_observations_mission_id", "mission_id"),
-        Index("ix_checkpoint_observations_georef_processing_run_id", "georef_processing_run_id"),
-        Index("ix_checkpoint_observations_gcp_id", "gcp_id"),
-    )
+    __table_args__ = ()

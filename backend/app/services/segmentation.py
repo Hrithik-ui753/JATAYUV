@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-import os
-import json
-=======
 """Aerial semantic segmentation service.
 
 P0 integrity contract
@@ -30,20 +26,10 @@ import threading
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
->>>>>>> 0400f2f (p5-udpated)
 import cv2
 import numpy as np
 import torch
 import torch.nn as nn
-<<<<<<< HEAD
-from typing import Dict, Any, List
-
-class AerialSegmentationModel(nn.Module):
-    """
-    High-Resolution Aerial Semantic Segmentation Network.
-    Maps aerial multispectral features into discrete spatial land-use classes.
-    """
-=======
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, "..", "..", ".."))
@@ -86,7 +72,6 @@ class AerialSegmentationModel(nn.Module):
     which always overwrites every parameter from a verified checkpoint.
     """
 
->>>>>>> 0400f2f (p5-udpated)
     def __init__(self, num_classes: int = 7):
         super().__init__()
         self.num_classes = num_classes
@@ -114,10 +99,6 @@ class AerialSegmentationModel(nn.Module):
         logits = self.classifier(feats)
         return logits
 
-<<<<<<< HEAD
-class SemanticSegmentationService:
-    CLASSES = [
-=======
 
 def file_sha256(path: str) -> str:
     digest = hashlib.sha256()
@@ -236,7 +217,6 @@ class _LoadedSegmentation:
 
 class SemanticSegmentationService:
     CLASSES: List[Dict[str, Any]] = [
->>>>>>> 0400f2f (p5-udpated)
         {"id": 0, "name": "background", "label": "Other / Unclassified", "color": [0, 0, 0]},
         {"id": 1, "name": "building", "label": "Buildings & Roofs", "color": [246, 92, 139]},   # BGR for #8b5cf6
         {"id": 2, "name": "vegetation", "label": "Canopy & Trees", "color": [129, 185, 16]},   # BGR for #10b981
@@ -246,13 +226,6 @@ class SemanticSegmentationService:
         {"id": 6, "name": "vehicle", "label": "Vehicles & Assets", "color": [68, 68, 239]},    # BGR for #ef4444
     ]
 
-<<<<<<< HEAD
-    def __init__(self):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = AerialSegmentationModel(num_classes=len(self.CLASSES)).to(self.device)
-        self.model.eval()
-
-=======
     def __init__(self, checkpoint_path: Optional[str] = None):
         # Nothing is loaded and no network is constructed here: a service object
         # alone must never imply that usable weights exist.
@@ -301,7 +274,6 @@ class SemanticSegmentationService:
             return self._loaded
 
     # --------------------------------------------------------------- inference
->>>>>>> 0400f2f (p5-udpated)
     def segment_aerial_image(
         self,
         input_image_path: str,
@@ -309,17 +281,11 @@ class SemanticSegmentationService:
         output_overlay_path: str,
         output_geojson_path: str = None,
     ) -> Dict[str, Any]:
-<<<<<<< HEAD
-        """
-        Segments land-use and land-cover classes from high-resolution aerial imagery.
-        """
-=======
         """Segment land-cover classes using a verified checkpoint only."""
         # Fail before touching the image or writing any artifact when weights are
         # unavailable, so callers never receive partial results.
         loaded = self.get_model()
 
->>>>>>> 0400f2f (p5-udpated)
         img = cv2.imread(input_image_path)
         if img is None:
             raise ValueError(f"Could not load image at {input_image_path}")
@@ -329,12 +295,6 @@ class SemanticSegmentationService:
         resized = cv2.resize(img, (target_w, target_h))
 
         rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
-<<<<<<< HEAD
-        tensor = torch.from_numpy(rgb.astype(np.float32) / 255.0).permute(2, 0, 1).unsqueeze(0).to(self.device)
-
-        with torch.no_grad():
-            logits = self.model(tensor)
-=======
         tensor = (
             torch.from_numpy(rgb.astype(np.float32) / 255.0)
             .permute(2, 0, 1)
@@ -344,7 +304,6 @@ class SemanticSegmentationService:
 
         with torch.no_grad():
             logits = loaded.model(tensor)
->>>>>>> 0400f2f (p5-udpated)
             preds = torch.argmax(logits, dim=1).squeeze().cpu().numpy().astype(np.uint8)
 
         # Scale predictions back to original resolution
@@ -369,17 +328,10 @@ class SemanticSegmentationService:
         overlay = cv2.addWeighted(img, 0.45, color_mask, 0.55, 0)
 
         # Save mask & overlay
-<<<<<<< HEAD
-        os.makedirs(os.path.dirname(output_mask_path), exist_ok=True)
-        cv2.imwrite(output_mask_path, dense_mask)
-
-        os.makedirs(os.path.dirname(output_overlay_path), exist_ok=True)
-=======
         os.makedirs(os.path.dirname(os.path.abspath(output_mask_path)), exist_ok=True)
         cv2.imwrite(output_mask_path, dense_mask)
 
         os.makedirs(os.path.dirname(os.path.abspath(output_overlay_path)), exist_ok=True)
->>>>>>> 0400f2f (p5-udpated)
         cv2.imwrite(output_overlay_path, overlay)
 
         # Optional GeoJSON polygon export of building footprints
@@ -387,16 +339,11 @@ class SemanticSegmentationService:
             self._export_building_geojson(dense_mask, output_geojson_path)
 
         return {
-<<<<<<< HEAD
-=======
             "status": "completed",
->>>>>>> 0400f2f (p5-udpated)
             "mask_path": output_mask_path,
             "overlay_path": output_overlay_path,
             "class_distribution": class_distribution,
             "geojson_path": output_geojson_path,
-<<<<<<< HEAD
-=======
             "checkpoint_path": loaded.info["checkpoint_path"],
             "checkpoint_sha256": loaded.info["checkpoint_sha256"],
             "architecture": loaded.info["architecture"],
@@ -405,7 +352,6 @@ class SemanticSegmentationService:
             "metrics_note": (
                 "No segmentation accuracy metric is computed or claimed at inference time."
             ),
->>>>>>> 0400f2f (p5-udpated)
         }
 
     def _export_building_geojson(self, mask: np.ndarray, geojson_path: str):
@@ -438,18 +384,9 @@ class SemanticSegmentationService:
             })
 
         fc = {"type": "FeatureCollection", "features": features}
-<<<<<<< HEAD
-        os.makedirs(os.path.dirname(geojson_path), exist_ok=True)
-        with open(geojson_path, "w", encoding="utf-8") as f:
-            json.dump(fc, f, indent=2)
-
-segmentation_service = SemanticSegmentationService()
-
-=======
         os.makedirs(os.path.dirname(os.path.abspath(geojson_path)), exist_ok=True)
         with open(geojson_path, "w", encoding="utf-8") as f:
             json.dump(fc, f, indent=2)
 
 
 segmentation_service = SemanticSegmentationService()
->>>>>>> 0400f2f (p5-udpated)

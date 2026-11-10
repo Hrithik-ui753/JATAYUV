@@ -12,7 +12,9 @@ import {
   Layers, 
   Activity, 
   ShieldCheck,
-  FileCheck2
+  FileCheck2,
+  Video,
+  Film
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 
@@ -22,17 +24,17 @@ export function WorkflowSection() {
   const steps = [
     {
       num: "01",
-      title: "Upload Aerial Imagery",
-      subtitle: "Multi-Format UAV Ingestion",
-      icon: UploadCloud,
-      desc: "Ingest high-resolution aerial frames (TIFF, JPEG, PNG, DNG) from DJI, Wingtra, Skydio, or satellite sources. The pipeline immediately parses camera sensor geometry, focal length, GPS latitude/longitude, and barometric AGL altitude from EXIF headers.",
+      title: "Upload Single-Pass Drone Video",
+      subtitle: "UAV Video & Telemetry Ingestion",
+      icon: Video,
+      desc: "Ingest single-pass aerial drone video (.mp4, .mov, .m4v, .avi) along with flight telemetry logs (.csv, .srt, .gpx). The pipeline validates video integrity, extracts keyframes at sub-second intervals, performs blur/exposure scoring, and aligns telemetry timestamps.",
       details: [
-        "EXIF & XMP metadata recovery",
-        "Sensor pitch, roll & yaw extraction",
-        "Automated high-fidelity thumbnail generation",
-        "Geospatial bounding box computation"
+        "PyAV / FFmpeg video stream decoding",
+        "Sub-second keyframe sampling & blur filtering",
+        "Perceptual dHash duplicate frame removal",
+        "Synchronized GPS/IMU telemetry mapping"
       ],
-      badge: "INGESTION PHASE"
+      badge: "DRONE VIDEO INGESTION"
     },
     {
       num: "02",

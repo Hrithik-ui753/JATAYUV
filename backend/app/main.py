@@ -1,19 +1,51 @@
-<<<<<<< HEAD
+import logging
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from backend.app.core.config import settings
-from backend.app.core.database import Base, engine, ensure_depth_result_schema
+from backend.app.core.database import engine
 from backend.app.api.v1 import auth, projects, images, analysis, reconstruction, jobs, training
 from backend.app.api.v1 import models as models_router
+from backend.app.api.v1 import (
+    mission_camera_poses,
+    mission_flight_metadata,
+    mission_validation,
+    mission_videos,
+    missions,
+)
+from backend.app.api.v1.routers import video_processing_router
 
-# Initialize Database Schema — creates tables for all registered models
-import backend.app.models  # noqa: F401 — ensures all models are imported before create_all
-Base.metadata.create_all(bind=engine)
+logger = logging.getLogger(__name__)
 
-# Non-destructive column additions for databases created by earlier releases.
-ensure_depth_result_schema()
+
+def _warn_if_schema_unmigrated() -> None:
+    """Warn (do not silently mutate) when the database has no Alembic stamp.
+
+    Schema provisioning is owned by Alembic (``alembic upgrade head``). The
+    application never calls ``create_all`` at startup, because doing so hides
+    missing migrations and produces schema drift on existing installations.
+    """
+    from sqlalchemy import inspect
+
+    try:
+        tables = set(inspect(engine).get_table_names())
+    except Exception as exc:  # database unreachable
+        logger.warning("Could not inspect database schema: %s", exc)
+        return
+    if not tables:
+        logger.error(
+            "Database has no tables. Run 'alembic upgrade head' before starting "
+            "the API (see backend/alembic.ini)."
+        )
+    elif "alembic_version" not in tables:
+        logger.warning(
+            "Database has no alembic_version table; run 'alembic upgrade head' "
+            "to bring the schema under migration control."
+        )
+
+
+_warn_if_schema_unmigrated()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -51,6 +83,14 @@ app.include_router(jobs.router, prefix=settings.API_V1_STR)
 app.include_router(models_router.router, prefix=settings.API_V1_STR)
 app.include_router(training.router, prefix=settings.API_V1_STR)
 
+# Mission / video routers
+app.include_router(missions.router, prefix=settings.API_V1_STR)
+app.include_router(mission_videos.router, prefix=settings.API_V1_STR)
+app.include_router(mission_flight_metadata.router, prefix=settings.API_V1_STR)
+app.include_router(mission_camera_poses.router, prefix=settings.API_V1_STR)
+app.include_router(mission_validation.router, prefix=settings.API_V1_STR)
+app.include_router(video_processing_router, prefix=settings.API_V1_STR)
+
 
 @app.get("/health", tags=["Platform"])
 def health_check():
@@ -76,23 +116,3 @@ def root():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
-=======
-from __future__ import annotations
-
-from fastapi import FastAPI
-
-from backend.app.api.v1.routers import (  # noqa: E402
-    frame_perception_router,
-    perception_router,
-    video_processing_router,
-)
-from backend.app.api.health import router as health_router
-
-app = FastAPI(
-    title="JATAYUV API",
-)
-app.include_router(health_router)
-app.include_router(video_processing_router)
-app.include_router(perception_router)
-app.include_router(frame_perception_router)
->>>>>>> 0400f2f (p5-udpated)
