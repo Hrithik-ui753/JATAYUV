@@ -91,3 +91,6 @@ Thumbs.db
 
 
 *.tsbuildinfo
+# Local COLMAP installation
+.tools/colmap/
+.tools/colmap.zip
