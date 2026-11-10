@@ -1,10 +1,18 @@
+<<<<<<< HEAD
 import logging
+=======
+<<<<<<< HEAD
+>>>>>>> origin/main
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from backend.app.core.config import settings
+<<<<<<< HEAD
 from backend.app.core.database import engine
+=======
+from backend.app.core.database import Base, engine, ensure_depth_result_schema
+>>>>>>> origin/main
 from backend.app.api.v1 import auth, projects, images, analysis, reconstruction, jobs, training
 from backend.app.api.v1 import models as models_router
 from backend.app.api.v1 import (
@@ -46,6 +54,9 @@ def _warn_if_schema_unmigrated() -> None:
 
 
 _warn_if_schema_unmigrated()
+
+# Non-destructive column additions for databases created by earlier releases.
+ensure_depth_result_schema()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -116,3 +127,23 @@ def root():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
+=======
+from __future__ import annotations
+
+from fastapi import FastAPI
+
+from backend.app.api.v1.routers import (  # noqa: E402
+    frame_perception_router,
+    perception_router,
+    video_processing_router,
+)
+from backend.app.api.health import router as health_router
+
+app = FastAPI(
+    title="JATAYUV API",
+)
+app.include_router(health_router)
+app.include_router(video_processing_router)
+app.include_router(perception_router)
+app.include_router(frame_perception_router)
+>>>>>>> 0400f2f (p5-udpated)

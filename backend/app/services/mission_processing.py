@@ -107,6 +107,7 @@ def enqueue_full_processing(
         )
         video = db.query(Video).filter(Video.id == video_id).first()
         task_kwargs = _build_pipeline_kwargs(job, video, video_processing_config)
+<<<<<<< HEAD
         try:
             async_result = _delay_pipeline(**task_kwargs)
         except Exception as exc:  # broker unreachable or misconfigured
@@ -126,6 +127,9 @@ def enqueue_full_processing(
             job.status = "queued"
         db.commit()
         db.refresh(job)
+=======
+        _delay_pipeline.delay(**task_kwargs)
+>>>>>>> origin/main
         return {
             "job_id": job.id,
             "celery_task_id": job.celery_task_id,
@@ -136,6 +140,7 @@ def enqueue_full_processing(
         db.close()
 
 
+<<<<<<< HEAD
 def cancel_video_processing(
     video_id: str,
     *,
@@ -185,6 +190,8 @@ def cancel_video_processing(
     return {"status": "cancelled", "job_id": job.id, "video_id": video_id}
 
 
+=======
+>>>>>>> origin/main
 def _build_pipeline_kwargs(
     job: Job,
     video: Video,
@@ -263,7 +270,11 @@ def get_processing_report_for_mission(
         Job.job_type == "video_processing",
     )
     if processing_run_id:
+<<<<<<< HEAD
         query = query.filter(Job.processing_run_id == processing_run_id)
+=======
+        query = query.filter(getattr(Job, "processing_run_id", None) == processing_run_id)
+>>>>>>> origin/main
     jobs = query.order_by(Job.created_at.desc()).all()
     if not jobs:
         return {"error": "no_processing_found"}

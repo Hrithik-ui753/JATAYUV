@@ -20,6 +20,12 @@ import numpy as np
 import pytest
 import torch
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+from training.datasets.drone_depth import DroneDepthDataset, build_valid_mask
+=======
+>>>>>>> origin/main
 # The dataset adapters (``training/datasets``) are not part of this repository snapshot,
 # so this module cannot be collected. Skip explicitly instead of breaking the whole run.
 pytest.importorskip(
@@ -28,6 +34,10 @@ pytest.importorskip(
 )
 
 from training.datasets.drone_depth import DroneDepthDataset, build_valid_mask  # noqa: E402
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 from training.datasets.manifest import DatasetManifest, DepthLabel, DepthSample
 from training.evaluation import calibration, metrics
 from training.losses.depth_losses import (

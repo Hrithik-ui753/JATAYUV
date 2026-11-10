@@ -15,7 +15,10 @@ from backend.app.schemas.frame import FrameResponse
 from backend.app.schemas.video import VideoResponse
 from backend.app.api.deps import get_current_user
 from backend.app.services.mission_processing import (
+<<<<<<< HEAD
     cancel_video_processing,
+=======
+>>>>>>> origin/main
     enqueue_full_processing,
     get_processing_report_for_mission,
     get_processing_status_for_mission,
@@ -63,6 +66,7 @@ def enqueue_video_processing(
     if video.mission_id != mission_id:
         raise HTTPException(status_code=400, detail="Video does not belong to this mission")
 
+<<<<<<< HEAD
     try:
         result = enqueue_full_processing(
             mission_id=mission_id,
@@ -97,6 +101,17 @@ def cancel_video_processing_endpoint(
         raise HTTPException(status_code=403, detail=str(exc))
 
 
+=======
+    result = enqueue_full_processing(
+        mission_id=mission_id,
+        video_id=video_id,
+        user_id=current_user.id,
+        video_processing_config=config.model_dump(exclude_none=True) if config else None,
+    )
+    return result
+
+
+>>>>>>> origin/main
 @router.get(
     "/missions/{mission_id}/processing-status",
     response_model=VideoProcessingStatusResponse,

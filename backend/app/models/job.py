@@ -9,6 +9,7 @@ class Job(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     project_id = Column(String(36), ForeignKey("projects.id"), nullable=False)
+<<<<<<< HEAD
     mission_id = Column(
         String(36), ForeignKey("missions.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -18,6 +19,19 @@ class Job(Base):
     )  # upload_validation | video_processing | depth_estimation | segmentation | camera_tracking | reconstruction | georeferencing | validation | export | None (legacy)
     owner_id = Column(String(36), ForeignKey("users.id"), nullable=True, index=True)
     processing_run_id = Column(String(64), nullable=True, index=True)
+=======
+<<<<<<< HEAD
+    job_type = Column(String(50), nullable=False)  # preprocessing, depth_estimation, semantic_segmentation, damage_assessment, change_detection, reconstruction_3d
+=======
+    mission_id = Column(
+        String(36), ForeignKey("missions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    job_type = Column(String(50), nullable=False)  # preprocessing, depth_estimation, semantic_segmentation, damage_assessment, change_detection, reconstruction_3d
+    stage = Column(
+        String(64), nullable=True
+    )  # upload_validation | video_processing | depth_estimation | segmentation | camera_tracking | reconstruction | georeferencing | validation | export | None (legacy)
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
     status = Column(String(50), default="pending", nullable=False)  # pending, queued, processing, completed, failed, cancelled
     progress_pct = Column(Integer, default=0, nullable=False)
     error_message = Column(Text, nullable=True)
@@ -31,7 +45,14 @@ class Job(Base):
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     project = relationship("Project", back_populates="jobs")
+<<<<<<< HEAD
     mission = relationship("Mission", back_populates="jobs")
+=======
+<<<<<<< HEAD
+=======
+    mission = relationship("Mission", back_populates="jobs")
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
     artifacts = relationship("Artifact", back_populates="job", cascade="all, delete-orphan")
     logs = relationship("JobLog", back_populates="job", cascade="all, delete-orphan", order_by="JobLog.created_at")
 

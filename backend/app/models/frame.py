@@ -18,6 +18,7 @@ from backend.app.core.database import Base
 class Frame(Base):
     __tablename__ = "frames"
     __table_args__ = (
+<<<<<<< HEAD
         Index("ix_frames_frame_index", "frame_index"),
         Index("ix_frames_presentation_timestamp", "presentation_timestamp"),
         Index("ix_frames_created_at", "created_at"),
@@ -27,6 +28,13 @@ class Frame(Base):
         Index("ix_frames_is_selected", "is_selected"),
         Index("ix_frames_gps_source", "gps_source"),
         Index("ix_frames_timestamp_seconds", "timestamp_seconds"),
+=======
+        Index("ix_frames_mission_id", "mission_id"),
+        Index("ix_frames_video_id", "video_id"),
+        Index("ix_frames_frame_index", "frame_index"),
+        Index("ix_frames_presentation_timestamp", "presentation_timestamp"),
+        Index("ix_frames_created_at", "created_at"),
+>>>>>>> origin/main
         UniqueConstraint("video_id", "frame_index", name="uq_video_frame_index"),
     )
 
@@ -47,6 +55,7 @@ class Frame(Base):
     exposure_score = Column(Float, nullable=True)
     duplicate_status = Column(
         String(32), default="unique", nullable=False
+<<<<<<< HEAD
     )  # unique | exact_duplicate | near_duplicate | candidate
     duplicate_hash = Column(String(128), nullable=True)
     duplicate_of_frame_id = Column(String(36), nullable=True)
@@ -68,6 +77,15 @@ class Frame(Base):
     gps_quality = Column(String(64), nullable=True)
     gps_source = Column(String(64), nullable=True)
     gps_association_gap_seconds = Column(Float, nullable=True)
+=======
+    )  # unique | duplicate | candidate
+    quality_status = Column(
+        String(32), default="unreviewed", nullable=False
+    )  # unreviewed | accepted | rejected | low_quality
+    gps_latitude = Column(Float, nullable=True)
+    gps_longitude = Column(Float, nullable=True)
+    altitude = Column(Float, nullable=True)
+>>>>>>> origin/main
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )

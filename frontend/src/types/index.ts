@@ -153,11 +153,20 @@ export interface ChangeDetectionResult {
   created_at: string;
 }
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> origin/main
 /**
  * Result of a real COLMAP reconstruction. `reprojection_error_px` is only present
  * when COLMAP reported it; `bounds` is null when the cloud bounds were unavailable.
  * COLMAP output is not georeferenced, so no DSM is produced.
  */
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 export interface Reconstruction3DResult {
   id: string;
   job_id: string;
@@ -167,7 +176,15 @@ export interface Reconstruction3DResult {
   dsm_tiff_path?: string;
   num_points: number;
   camera_count: number;
+<<<<<<< HEAD
   reprojection_error_px: number | null;
+=======
+<<<<<<< HEAD
+  reprojection_error_px: number;
+=======
+  reprojection_error_px: number | null;
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
   bounds: {
     min_x: number;
     max_x: number;
@@ -175,6 +192,7 @@ export interface Reconstruction3DResult {
     max_y: number;
     min_z: number;
     max_z: number;
+<<<<<<< HEAD
   } | null;
   backend?: string | null;
   status?: string | null;
@@ -184,6 +202,23 @@ export interface Reconstruction3DResult {
   created_at: string;
 }
 
+=======
+<<<<<<< HEAD
+  };
+  created_at: string;
+}
+
+=======
+  } | null;
+  backend?: string | null;
+  status?: string | null;
+  georeferenced?: boolean | null;
+  mesh_unavailable_reason?: string | null;
+  dsm_unavailable_reason?: string | null;
+  created_at: string;
+}
+
+>>>>>>> origin/main
 // ---------------------------------------------------------------------------
 // Mission video processing (P2) types
 // ---------------------------------------------------------------------------
@@ -315,3 +350,7 @@ export interface EnqueueProcessingResponse {
   status: string;
 }
 
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main

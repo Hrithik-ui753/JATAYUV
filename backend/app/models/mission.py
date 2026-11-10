@@ -76,6 +76,11 @@ class Mission(Base):
 
     __table_args__ = (
         Index("ix_missions_status_created", "status", "created_at"),
+<<<<<<< HEAD
+=======
+        Index("ix_missions_user_id", "user_id"),
+        Index("ix_missions_project_id", "project_id"),
+>>>>>>> origin/main
         CheckConstraint(
             f"status IN ({','.join(repr(s) for s in sorted(MISSION_STATUSES))})",
             name="ck_mission_status_values",

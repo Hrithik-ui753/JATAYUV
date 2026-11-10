@@ -8,6 +8,11 @@ import cv2
 import numpy as np
 import numpy.typing as npt
 
+<<<<<<< HEAD
+=======
+from backend.app.services.perception import describe_dynamic_detection_model
+
+>>>>>>> origin/main
 log = logging.getLogger("jatayuv.perception.dynamic")
 
 Detection = Dict[str, Any]
@@ -87,11 +92,20 @@ def build_dynamic_exclusion_mask(
 
 
 def is_dynamic_detection_available() -> bool:
+<<<<<<< HEAD
     info = describe_dynamic_model()
+=======
+    from backend.app.services.perception.dynamic import (
+        describe_dynamic_detection_model as _describe,
+    )
+
+    info = _describe()
+>>>>>>> origin/main
     return bool(info.get("checkpoint_available")) and bool(info.get("model_id"))
 
 
 def describe_dynamic_model() -> Dict[str, Any]:
+<<<<<<< HEAD
     cats = sorted(list(_DYNAMIC_CATEGORIES))
     return {
         "model_id": None,
@@ -106,6 +120,9 @@ def describe_dynamic_model() -> Dict[str, Any]:
 
 describe_dynamic_detection_model = describe_dynamic_model
 
+=======
+    return describe_dynamic_detection_model()
+>>>>>>> origin/main
 
 
 _DYNAMIC_CATEGORIES = {

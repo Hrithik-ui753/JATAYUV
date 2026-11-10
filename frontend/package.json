@@ -7,8 +7,17 @@
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint",
+<<<<<<< HEAD
     "type-check": "tsc --noEmit",
     "test": "node --test tests/"
+=======
+<<<<<<< HEAD
+    "type-check": "tsc --noEmit"
+=======
+    "type-check": "tsc --noEmit",
+    "test": "node --test tests/"
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
   },
   "dependencies": {
     "@react-three/drei": "^9.106.0",

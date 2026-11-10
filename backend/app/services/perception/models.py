@@ -72,7 +72,11 @@ class PerceptionRun(Base):
         "FramePerception",
         backref="perception_run",
         cascade="all, delete-orphan",
+<<<<<<< HEAD
         order_by="FramePerception.created_at",
+=======
+        order_by="FramePerception.frame_index",
+>>>>>>> origin/main
     )
 
     __table_args__ = (
@@ -90,7 +94,11 @@ class FramePerception(Base):
         String(36), ForeignKey("perception_runs.id", ondelete="CASCADE"), nullable=False, index=True
     )
     frame_id = Column(
+<<<<<<< HEAD
         String(36), ForeignKey("frames.id", ondelete="CASCADE"), nullable=False
+=======
+        String(36), ForeignKey("frames.id", ondelete="CASCADE"), nullable=False, index=True
+>>>>>>> origin/main
     )
     status = Column(
         String(32),
@@ -220,7 +228,11 @@ class PerceptionArtifact(Base):
     perception_run_id = Column(
         String(36), ForeignKey("perception_runs.id", ondelete="CASCADE"), nullable=False, index=True
     )
+<<<<<<< HEAD
     frame_id = Column(String(36), ForeignKey("frames.id", ondelete="SET NULL"), nullable=True)
+=======
+    frame_id = Column(String(36), ForeignKey("frames.id", ondelete="SET NULL"), nullable=True, index=True)
+>>>>>>> origin/main
     artifact_type = Column(String(64), nullable=False)
     storage_path = Column(String(512), nullable=False)
     relative_path = Column(String(512), nullable=True)

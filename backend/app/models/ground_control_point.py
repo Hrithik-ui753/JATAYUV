@@ -51,5 +51,9 @@ class GroundControlPoint(Base):
     georef_processing_run = relationship("GeorefProcessingRun", backref="ground_control_points")
 
     __table_args__ = (
+<<<<<<< HEAD
+=======
+        Index("ix_ground_control_points_mission_id", "mission_id"),
+>>>>>>> origin/main
         Index("ix_ground_control_points_role", "role"),
     )

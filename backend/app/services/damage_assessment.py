@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """Multi-temporal building damage assessment service (xBD 4-tier).
 
 P0 integrity contract
@@ -17,15 +18,92 @@ raw state dict or one of ``model_state`` / ``state_dict`` / ``model_state_dict``
 from __future__ import annotations
 
 import json
+=======
+<<<<<<< HEAD
+import os
+import json
+=======
+"""Multi-temporal building damage assessment service (xBD 4-tier).
+
+P0 integrity contract
+---------------------
+* Inference only runs with a verified trained checkpoint loaded strictly.
+* Randomly initialised weights are never built at import time and never used as a
+  fallback.
+* A missing/incompatible checkpoint raises :class:`DamageModelUnavailable`
+  (``status="unavailable"``) before any artifact is written.
+* Damage classes, counts and severity are derived only from real network output.
+  No accuracy metric is computed or claimed at inference time.
+
+Checkpoint format mirrors the segmentation service: a ``torch.save`` dict holding a
+raw state dict or one of ``model_state`` / ``state_dict`` / ``model_state_dict`` /
+``weights``, optionally with ``architecture``, ``num_classes`` and provenance.
+"""
+from __future__ import annotations
+
+import json
+>>>>>>> origin/main
 import os
 import threading
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 import cv2
 import numpy as np
 import torch
 import torch.nn as nn
+<<<<<<< HEAD
+
+from .segmentation import file_sha256, _extract_state_dict
+
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, "..", "..", ".."))
+
+ARCHITECTURE = "SiameseDamageAssessmentModel"
+
+DEFAULT_DAMAGE_CHECKPOINT = os.environ.get(
+    "JATAYUV_DAMAGE_CHECKPOINT",
+    os.path.join(_REPO_ROOT, "storage", "models", "checkpoints", "damage_xbd_siamese.pth"),
+)
+
+
+class DamageModelUnavailable(RuntimeError):
+    """Raised when no verified damage-assessment checkpoint can be loaded."""
+
+    status = "unavailable"
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        checkpoint_path: Optional[str] = None,
+        reason: str = "checkpoint_missing",
+    ) -> None:
+        super().__init__(message)
+        self.checkpoint_path = checkpoint_path
+        self.reason = reason
+
+=======
+<<<<<<< HEAD
+from typing import Dict, Any, List
+>>>>>>> origin/main
+
+class SiameseDamageAssessmentModel(nn.Module):
+    """Dual-stream Siamese network for aligned pre/post disaster aerial imagery.
+
+    Architecture definition only; see :func:`load_verified_model`.
+    """
+
+    def __init__(self, num_damage_classes: int = 4):
+        super().__init__()
+<<<<<<< HEAD
+        self.num_damage_classes = num_damage_classes
+=======
+=======
 
 from .segmentation import file_sha256, _extract_state_dict
 
@@ -66,6 +144,8 @@ class SiameseDamageAssessmentModel(nn.Module):
     def __init__(self, num_damage_classes: int = 4):
         super().__init__()
         self.num_damage_classes = num_damage_classes
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
         # Shared feature encoder
         self.branch = nn.Sequential(
             nn.Conv2d(3, 32, kernel_size=3, padding=1),
@@ -96,6 +176,7 @@ class SiameseDamageAssessmentModel(nn.Module):
         logits = self.classifier(fused)
         return logits
 
+<<<<<<< HEAD
 
 def load_verified_model(
     checkpoint_path: str,
@@ -181,18 +262,126 @@ class _LoadedDamageModel:
 
 class DamageAssessmentService:
     DAMAGE_LEVELS: List[Dict[str, Any]] = [
+=======
+<<<<<<< HEAD
+class DamageAssessmentService:
+    DAMAGE_LEVELS = [
+=======
+
+def load_verified_model(
+    checkpoint_path: str,
+    *,
+    num_damage_classes: int,
+    device: torch.device,
+) -> tuple[SiameseDamageAssessmentModel, Dict[str, Any]]:
+    """Build the architecture and load every weight from a verified checkpoint."""
+    if not checkpoint_path or not os.path.isfile(checkpoint_path):
+        raise DamageModelUnavailable(
+            "No verified damage-assessment checkpoint found at "
+            f"{checkpoint_path!r}. Train or install a checkpoint and point "
+            "JATAYUV_DAMAGE_CHECKPOINT at it; random weights are never used.",
+            checkpoint_path=checkpoint_path,
+            reason="checkpoint_missing",
+        )
+
+    try:
+        payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    except Exception as exc:
+        raise DamageModelUnavailable(
+            f"Damage checkpoint at {checkpoint_path!r} could not be read: {exc}",
+            checkpoint_path=checkpoint_path,
+            reason="checkpoint_unreadable",
+        ) from exc
+
+    metadata: Dict[str, Any] = payload if isinstance(payload, dict) else {}
+    architecture = metadata.get("architecture")
+    if architecture is not None and architecture != ARCHITECTURE:
+        raise DamageModelUnavailable(
+            f"Damage checkpoint architecture {architecture!r} does not match {ARCHITECTURE!r}.",
+            checkpoint_path=checkpoint_path,
+            reason="architecture_mismatch",
+        )
+    declared_classes = metadata.get("num_classes")
+    if declared_classes is not None and int(declared_classes) != num_damage_classes:
+        raise DamageModelUnavailable(
+            f"Damage checkpoint declares {declared_classes} classes but the service "
+            f"expects {num_damage_classes}.",
+            checkpoint_path=checkpoint_path,
+            reason="class_count_mismatch",
+        )
+
+    try:
+        state_dict, _ = _extract_state_dict(payload)
+    except Exception as exc:
+        raise DamageModelUnavailable(
+            f"Damage checkpoint does not contain a recognisable model state dict: {exc}",
+            checkpoint_path=checkpoint_path,
+            reason="checkpoint_unreadable",
+        ) from exc
+
+    model = SiameseDamageAssessmentModel(num_damage_classes=num_damage_classes)
+    try:
+        model.load_state_dict(state_dict, strict=True)
+    except Exception as exc:
+        raise DamageModelUnavailable(
+            f"Damage checkpoint is incompatible with {ARCHITECTURE}: {exc}",
+            checkpoint_path=checkpoint_path,
+            reason="state_dict_incompatible",
+        ) from exc
+
+    model.to(device).eval()
+    info = {
+        "architecture": ARCHITECTURE,
+        "num_classes": num_damage_classes,
+        "checkpoint_path": checkpoint_path,
+        "checkpoint_sha256": file_sha256(checkpoint_path),
+        "dataset": metadata.get("dataset"),
+        "training_run": metadata.get("training_run"),
+        "created_at": metadata.get("created_at"),
+        "reported_metrics": metadata.get("metrics"),
+    }
+    return model, info
+
+
+@dataclass
+class _LoadedDamageModel:
+    model: SiameseDamageAssessmentModel
+    device: torch.device
+    info: Dict[str, Any]
+
+
+class DamageAssessmentService:
+    DAMAGE_LEVELS: List[Dict[str, Any]] = [
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
         {"id": 0, "key": "no_damage", "label": "No Damage", "color": [46, 204, 113]},       # Emerald
         {"id": 1, "key": "minor_damage", "label": "Minor Damage", "color": [241, 196, 15]}, # Yellow
         {"id": 2, "key": "major_damage", "label": "Major Damage", "color": [230, 126, 34]}, # Orange
         {"id": 3, "key": "destroyed", "label": "Destroyed", "color": [231, 76, 60]},        # Red
     ]
 
+<<<<<<< HEAD
     def __init__(self, checkpoint_path: Optional[str] = None):
         self._checkpoint_path = checkpoint_path or DEFAULT_DAMAGE_CHECKPOINT
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._loaded: Optional[_LoadedDamageModel] = None
         self._lock = threading.Lock()
 
+=======
+<<<<<<< HEAD
+    def __init__(self):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = SiameseDamageAssessmentModel(num_damage_classes=4).to(self.device)
+        self.model.eval()
+
+=======
+    def __init__(self, checkpoint_path: Optional[str] = None):
+        self._checkpoint_path = checkpoint_path or DEFAULT_DAMAGE_CHECKPOINT
+        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._loaded: Optional[_LoadedDamageModel] = None
+        self._lock = threading.Lock()
+
+>>>>>>> origin/main
     # ------------------------------------------------------------- availability
     @property
     def checkpoint_path(self) -> str:
@@ -231,6 +420,10 @@ class DamageAssessmentService:
             return self._loaded
 
     # --------------------------------------------------------------- inference
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
     def assess_damage(
         self,
         pre_image_path: str,
@@ -238,9 +431,21 @@ class DamageAssessmentService:
         output_overlay_path: str,
         output_geojson_path: str = None,
     ) -> Dict[str, Any]:
+<<<<<<< HEAD
         """Evaluate building damage with a verified checkpoint only."""
         loaded = self.get_model()
 
+=======
+<<<<<<< HEAD
+        """
+        Executes xBD-standard building damage evaluation between Pre and Post aerial captures.
+        """
+=======
+        """Evaluate building damage with a verified checkpoint only."""
+        loaded = self.get_model()
+
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
         pre_img = cv2.imread(pre_image_path)
         post_img = cv2.imread(post_image_path)
 
@@ -255,6 +460,23 @@ class DamageAssessmentService:
 
         pre_tensor = torch.from_numpy(
             cv2.cvtColor(pre_resized, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+<<<<<<< HEAD
+        ).permute(2, 0, 1).unsqueeze(0).to(loaded.device)
+=======
+<<<<<<< HEAD
+        ).permute(2, 0, 1).unsqueeze(0).to(self.device)
+>>>>>>> origin/main
+
+        post_tensor = torch.from_numpy(
+            cv2.cvtColor(post_resized, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+        ).permute(2, 0, 1).unsqueeze(0).to(loaded.device)
+
+        with torch.no_grad():
+<<<<<<< HEAD
+            logits = loaded.model(pre_tensor, post_tensor)
+=======
+            logits = self.model(pre_tensor, post_tensor)
+=======
         ).permute(2, 0, 1).unsqueeze(0).to(loaded.device)
 
         post_tensor = torch.from_numpy(
@@ -263,13 +485,25 @@ class DamageAssessmentService:
 
         with torch.no_grad():
             logits = loaded.model(pre_tensor, post_tensor)
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
             preds = torch.argmax(logits, dim=1).squeeze().cpu().numpy().astype(np.uint8)
 
         # Scale predictions back to original resolution
         dense_damage = cv2.resize(preds, (orig_w, orig_h), interpolation=cv2.INTER_NEAREST)
 
+<<<<<<< HEAD
         # Footprint derivation: threshold on the pre-disaster image. These are heuristic
         # candidate footprints, not model-predicted building instances; the report says so.
+=======
+<<<<<<< HEAD
+        # Extract simulated discrete building contours
+        # In production, building polygons are mapped from pre-disaster footprint mask
+=======
+        # Footprint derivation: threshold on the pre-disaster image. These are heuristic
+        # candidate footprints, not model-predicted building instances; the report says so.
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
         gray_pre = cv2.cvtColor(pre_img, cv2.COLOR_BGR2GRAY)
         _, thresh = cv2.threshold(gray_pre, 140, 255, cv2.THRESH_BINARY)
         contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -342,24 +576,68 @@ class DamageAssessmentService:
         severity_index = round(weighted_sum / max(1, total_buildings), 3)
 
         # Save damage overlay image
+<<<<<<< HEAD
         os.makedirs(os.path.dirname(os.path.abspath(output_overlay_path)), exist_ok=True)
+=======
+<<<<<<< HEAD
+        os.makedirs(os.path.dirname(output_overlay_path), exist_ok=True)
+=======
+        os.makedirs(os.path.dirname(os.path.abspath(output_overlay_path)), exist_ok=True)
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
         cv2.imwrite(output_overlay_path, damage_overlay, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
         # Save GeoJSON export
         if output_geojson_path:
+<<<<<<< HEAD
             os.makedirs(os.path.dirname(os.path.abspath(output_geojson_path)), exist_ok=True)
+=======
+<<<<<<< HEAD
+            os.makedirs(os.path.dirname(output_geojson_path), exist_ok=True)
+=======
+            os.makedirs(os.path.dirname(os.path.abspath(output_geojson_path)), exist_ok=True)
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
             fc = {"type": "FeatureCollection", "features": geojson_features}
             with open(output_geojson_path, "w", encoding="utf-8") as f:
                 json.dump(fc, f, indent=2)
 
         return {
+<<<<<<< HEAD
             "status": "completed",
+=======
+<<<<<<< HEAD
+=======
+            "status": "completed",
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
             "damage_overlay_path": output_overlay_path,
             "total_buildings": total_buildings,
             "counts_by_level": counts_by_level,
             "damage_percentage": damage_percentage,
             "severity_index": severity_index,
             "geojson_path": output_geojson_path,
+<<<<<<< HEAD
+            "checkpoint_path": loaded.info["checkpoint_path"],
+            "checkpoint_sha256": loaded.info["checkpoint_sha256"],
+            "architecture": loaded.info["architecture"],
+            "dataset": loaded.info["dataset"],
+            "reported_metrics": loaded.info["reported_metrics"],
+            "footprint_source": "pre_image_threshold_heuristic",
+            "metrics_note": (
+                "Severity index and damage percentages are computed from this run's "
+                "predictions. No accuracy metric is claimed at inference time."
+            ),
+=======
+<<<<<<< HEAD
+>>>>>>> origin/main
+        }
+
+
+<<<<<<< HEAD
+damage_service = DamageAssessmentService()
+=======
+=======
             "checkpoint_path": loaded.info["checkpoint_path"],
             "checkpoint_sha256": loaded.info["checkpoint_sha256"],
             "architecture": loaded.info["architecture"],
@@ -374,3 +652,5 @@ class DamageAssessmentService:
 
 
 damage_service = DamageAssessmentService()
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main

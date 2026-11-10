@@ -1,4 +1,5 @@
 from datetime import datetime
+<<<<<<< HEAD
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 
@@ -24,10 +25,19 @@ class ReconstructionResponse(BaseModel):
     class Config:
         from_attributes = True
 
+<<<<<<< HEAD
 
 class MissionReconstructionResponse(BaseModel):
     """Mission-scoped reconstruction record (``Reconstruction`` model)."""
 
+=======
+=======
+from typing import Optional
+from pydantic import BaseModel, Field
+
+
+class ReconstructionResponse(BaseModel):
+>>>>>>> origin/main
     id: str
     mission_id: str
     reconstruction_version: str
@@ -46,5 +56,10 @@ class MissionReconstructionResponse(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime] = None
 
+<<<<<<< HEAD
     class Config:
         from_attributes = True
+=======
+    model_config = {"from_attributes": True}
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main

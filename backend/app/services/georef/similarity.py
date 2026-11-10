@@ -57,9 +57,14 @@ def compute_weighted_similarity_transform(
     if det(R) < 0:
         Vt[-1, :] *= -1
         R = Vt.T @ U.T
+<<<<<<< HEAD
     R_src = (R @ src_centered.T).T
     scale_num = float(np.sum(weights * np.sum(tgt_centered * R_src, axis=1)))
     scale_den = float(np.sum(weights * np.sum(src_centered * src_centered, axis=1)))
+=======
+    scale_num = np.sum(weights * np.sum((tgt_centered * R @ src_centered.T).T * src_centered, axis=1))
+    scale_den = np.sum(weights * np.sum(src_centered * src_centered, axis=1))
+>>>>>>> origin/main
     scale = scale_num / scale_den if scale_den != 0 else 1.0
     if scale <= 0:
         scale = 1.0

@@ -8,7 +8,10 @@
 """
 from __future__ import annotations
 
+<<<<<<< HEAD
 import json
+=======
+>>>>>>> origin/main
 import os
 import time
 import traceback
@@ -18,13 +21,19 @@ from typing import Any, Dict, List, Optional
 import celery
 
 from backend.app.core.database import SessionLocal
+<<<<<<< HEAD
 from backend.app.models.flight_metadata import FlightMetadata
+=======
+>>>>>>> origin/main
 from backend.app.models.frame import Frame
 from backend.app.models.job import Job
 from backend.app.models.job_log import JobLog
 from backend.app.models.video import Video
 from backend.app.repositories.job_repo import JobRepository
+<<<<<<< HEAD
 from backend.app.services.duplicate_detector import detect_duplicates_in_batch
+=======
+>>>>>>> origin/main
 from backend.app.services.frame_extractor import FrameExtractionConfig
 from backend.app.services.frame_quality import QualityConfig, analyze_frame_quality, quality_result_to_dict
 from backend.app.services.frame_selection import FrameCandidate, SelectionConfig, select_frames
@@ -34,6 +43,12 @@ from backend.app.services.gps_association import (
     flight_metadata_to_gps_records,
     parse_csv_telemetry,
 )
+<<<<<<< HEAD
+=======
+def _new_processing_run_id() -> str:
+    import uuid
+    return uuid.uuid4().hex
+>>>>>>> origin/main
 from backend.app.services.storage import get_mission_storage
 from backend.app.services.video_probe import (
     VideoLimits,
@@ -43,12 +58,15 @@ from backend.app.services.video_probe import (
 from backend.app.workers.celery_app import celery_app
 
 
+<<<<<<< HEAD
 def _new_processing_run_id() -> str:
     import uuid
 
     return uuid.uuid4().hex
 
 
+=======
+>>>>>>> origin/main
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -81,6 +99,7 @@ def _update_job(
 
 
 def _check_cancelled(db, job: Job) -> bool:
+<<<<<<< HEAD
     # Cancellation is written by another request/session, so refresh the row
     # before deciding whether the worker should stop.
     try:
@@ -88,6 +107,11 @@ def _check_cancelled(db, job: Job) -> bool:
     except Exception:
         pass
     return job.status in ("cancelled",)
+=======
+    if job.status in ("cancelled",):
+        return True
+    return False
+>>>>>>> origin/main
 
 
 def _ensure_processing_run(job: Job, db) -> str:

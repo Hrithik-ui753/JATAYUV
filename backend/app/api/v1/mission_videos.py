@@ -1,22 +1,33 @@
+<<<<<<< HEAD
 import hashlib
 import os
 import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+=======
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status
+>>>>>>> origin/main
 from sqlalchemy.orm import Session
 from backend.app.core.database import get_db
 from backend.app.core.config import settings
 from backend.app.models.mission import Mission
 from backend.app.models.video import Video
 from backend.app.models.user import User
+<<<<<<< HEAD
 from backend.app.models.flight_metadata import FlightMetadata
+=======
+>>>>>>> origin/main
 from backend.app.schemas.video import VideoCreate, VideoUploadResponse, VideoResponse
 from backend.app.api.deps import get_current_user, check_project_owner
 
 router = APIRouter(tags=["Mission Videos"])
 
+<<<<<<< HEAD
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 
+=======
+>>>>>>> origin/main
 
 def _video_to_response(video: Video) -> VideoResponse:
     return VideoResponse(
@@ -39,6 +50,7 @@ def _video_to_response(video: Video) -> VideoResponse:
 
 
 @router.post(
+<<<<<<< HEAD
     "/missions/{mission_id}/videos/upload",
     response_model=VideoResponse,
     status_code=status.HTTP_201_CREATED,
@@ -185,6 +197,8 @@ async def upload_project_video(
 
 
 @router.post(
+=======
+>>>>>>> origin/main
     "/missions/{mission_id}/videos",
     response_model=VideoUploadResponse,
     status_code=status.HTTP_201_CREATED,

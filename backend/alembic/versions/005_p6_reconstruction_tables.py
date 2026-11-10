@@ -18,6 +18,7 @@ from sqlalchemy import (
     Text,
     JSON,
 )
+<<<<<<< HEAD
 import sqlalchemy as sa
 from alembic import op
 
@@ -34,6 +35,10 @@ def _create_table_if_missing(name, *args, **kwargs):
         return
     op.create_table(name, *args, **kwargs)
 
+=======
+from alembic import op
+
+>>>>>>> origin/main
 revision = "005_p6_reconstruction_tables"
 down_revision = "004_p5_georef_tables"
 branch_labels = None
@@ -44,12 +49,21 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # ReconstructionRun
     # ------------------------------------------------------------------
+<<<<<<< HEAD
     _create_table_if_missing(
         "reconstruction_runs",
         Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
         Column("mission_id", String(36), ForeignKey("missions.id", ondelete="CASCADE"), nullable=False),
         Column("georef_processing_run_id", String(36), ForeignKey("georef_processing_runs.id", ondelete="SET NULL"), nullable=True),
         Column("processing_run_id", String(36), ForeignKey("processing_runs.id", ondelete="SET NULL"), nullable=True),
+=======
+    op.create_table(
+        "reconstruction_runs",
+        Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
+        Column("mission_id", String(36), ForeignKey("missions.id", ondelete="CASCADE"), nullable=False, index=True),
+        Column("georef_processing_run_id", String(36), ForeignKey("georef_processing_runs.id", ondelete="SET NULL"), nullable=True, index=True),
+        Column("processing_run_id", String(36), ForeignKey("processing_runs.id", ondelete="SET NULL"), nullable=True, index=True),
+>>>>>>> origin/main
         Column("reconstruction_version", String(64), nullable=False),
         Column("reconstruction_method", String(128), nullable=False),
         Column("status", String(50), nullable=False),
@@ -78,6 +92,7 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # ReconstructionFrame
     # ------------------------------------------------------------------
+<<<<<<< HEAD
     _create_table_if_missing(
         "reconstruction_frames",
         Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
@@ -87,6 +102,17 @@ def upgrade() -> None:
         Column("depth_artifact_id", String(36), ForeignKey("perception_artifacts.id", ondelete="SET NULL"), nullable=True),
         Column("segmentation_artifact_id", String(36), ForeignKey("perception_artifacts.id", ondelete="SET NULL"), nullable=True),
         Column("dynamic_mask_artifact_id", String(36), ForeignKey("perception_artifacts.id", ondelete="SET NULL"), nullable=True),
+=======
+    op.create_table(
+        "reconstruction_frames",
+        Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
+        Column("reconstruction_run_id", String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False, index=True),
+        Column("frame_id", String(36), ForeignKey("frames.id", ondelete="SET NULL"), nullable=False, index=True),
+        Column("camera_pose_id", String(36), ForeignKey("camera_poses.id", ondelete="SET NULL"), nullable=True, index=True),
+        Column("depth_artifact_id", String(36), ForeignKey("perception_artifacts.id", ondelete="SET NULL"), nullable=True, index=True),
+        Column("segmentation_artifact_id", String(36), ForeignKey("perception_artifacts.id", ondelete="SET NULL"), nullable=True, index=True),
+        Column("dynamic_mask_artifact_id", String(36), ForeignKey("perception_artifacts.id", ondelete="SET NULL"), nullable=True, index=True),
+>>>>>>> origin/main
         Column("contribution_status", String(64), nullable=True),
         Column("notes_json", JSON, nullable=True),
         Column("created_at", DateTime, nullable=False),
@@ -102,10 +128,17 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # PointCloudArtifact
     # ------------------------------------------------------------------
+<<<<<<< HEAD
     _create_table_if_missing(
         "point_cloud_artifacts",
         Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
         Column("reconstruction_run_id", String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False),
+=======
+    op.create_table(
+        "point_cloud_artifacts",
+        Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
+        Column("reconstruction_run_id", String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False, index=True),
+>>>>>>> origin/main
         Column("storage_path", String(512), nullable=False),
         Column("relative_path", String(512), nullable=True),
         Column("file_size_bytes", Integer, nullable=True),
@@ -126,10 +159,17 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # MeshArtifact
     # ------------------------------------------------------------------
+<<<<<<< HEAD
     _create_table_if_missing(
         "mesh_artifacts",
         Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
         Column("reconstruction_run_id", String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False),
+=======
+    op.create_table(
+        "mesh_artifacts",
+        Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
+        Column("reconstruction_run_id", String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False, index=True),
+>>>>>>> origin/main
         Column("storage_path", String(512), nullable=False),
         Column("relative_path", String(512), nullable=True),
         Column("file_size_bytes", Integer, nullable=True),
@@ -152,10 +192,17 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # TextureArtifact
     # ------------------------------------------------------------------
+<<<<<<< HEAD
     _create_table_if_missing(
         "texture_artifacts",
         Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
         Column("reconstruction_run_id", String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False),
+=======
+    op.create_table(
+        "texture_artifacts",
+        Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
+        Column("reconstruction_run_id", String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False, index=True),
+>>>>>>> origin/main
         Column("storage_path", String(512), nullable=False),
         Column("relative_path", String(512), nullable=True),
         Column("file_size_bytes", Integer, nullable=True),
@@ -172,10 +219,17 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # ReconstructionQualityReport
     # ------------------------------------------------------------------
+<<<<<<< HEAD
     _create_table_if_missing(
         "reconstruction_quality_reports",
         Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
         Column("reconstruction_run_id", String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False),
+=======
+    op.create_table(
+        "reconstruction_quality_reports",
+        Column("id", String(36), primary_key=True, default=op.inline_literal(str)),
+        Column("reconstruction_run_id", String(36), ForeignKey("reconstruction_runs.id", ondelete="CASCADE"), nullable=False, index=True),
+>>>>>>> origin/main
         Column("validated_point_count", Integer, nullable=True),
         Column("validated_registered_images", Integer, nullable=True),
         Column("validated_reprojection_error_px", Float, nullable=True),

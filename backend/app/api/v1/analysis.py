@@ -27,6 +27,13 @@ from backend.app.schemas.analysis import (
 )
 from backend.app.services.depth_estimation import depth_service
 from backend.app.services.depth_engine import DepthModelError
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+from backend.app.services.segmentation import segmentation_service
+from backend.app.services.damage_assessment import damage_service
+=======
+>>>>>>> origin/main
 from backend.app.services.segmentation import (
     SegmentationModelUnavailable,
     segmentation_service,
@@ -35,11 +42,20 @@ from backend.app.services.damage_assessment import (
     DamageModelUnavailable,
     damage_service,
 )
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 from backend.app.services.change_detection import change_service
 from backend.app.api.deps import get_current_user, check_project_owner
 
 router = APIRouter(prefix="/analysis", tags=["AI Inference Services"])
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> origin/main
 
 def _unavailable_detail(service: str, exc: Exception) -> dict:
     """Structured 503 payload: the model is unavailable, not failed."""
@@ -52,6 +68,10 @@ def _unavailable_detail(service: str, exc: Exception) -> dict:
     }
 
 
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 # --- 1. Monocular Depth Estimation ---
 def _depth_response(record: DepthResult) -> DepthResponse:
     """Map an ORM row to the API model without faking metric depth.
@@ -136,10 +156,20 @@ def trigger_depth_estimation(
         job.status = "failed"
         job.error_message = str(exc)
         db.commit()
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+        raise HTTPException(status_code=503, detail=str(exc))
+=======
+>>>>>>> origin/main
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=_unavailable_detail("depth_estimation", exc),
         )
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
     except Exception as exc:
         job.status = "failed"
         job.error_message = f"Depth inference failed: {exc}"
@@ -216,6 +246,17 @@ def trigger_segmentation(
     overlay_path = os.path.join(settings.PROCESSED_DIR, f"segoverlay_{image.id}.png")
     geojson_path = os.path.join(settings.PROCESSED_DIR, f"buildings_{image.id}.geojson")
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+    res = segmentation_service.segment_aerial_image(
+        input_image_path=image.file_path,
+        output_mask_path=mask_path,
+        output_overlay_path=overlay_path,
+        output_geojson_path=geojson_path,
+    )
+=======
+>>>>>>> origin/main
     try:
         res = segmentation_service.segment_aerial_image(
             input_image_path=image.file_path,
@@ -241,6 +282,10 @@ def trigger_segmentation(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Segmentation inference failed: {exc}",
         ) from exc
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 
     seg_record = SegmentationResult(
         job_id=job.id,
@@ -314,6 +359,17 @@ def trigger_damage_assessment(
     overlay_path = os.path.join(settings.PROCESSED_DIR, f"damage_{post_img.id}.png")
     geojson_path = os.path.join(settings.PROCESSED_DIR, f"damage_{post_img.id}.geojson")
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+    res = damage_service.assess_damage(
+        pre_image_path=pre_img.file_path,
+        post_image_path=post_img.file_path,
+        output_overlay_path=overlay_path,
+        output_geojson_path=geojson_path,
+    )
+=======
+>>>>>>> origin/main
     try:
         res = damage_service.assess_damage(
             pre_image_path=pre_img.file_path,
@@ -337,6 +393,10 @@ def trigger_damage_assessment(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Damage assessment failed: {exc}",
         ) from exc
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 
     damage_record = DamageAssessmentResult(
         job_id=job.id,

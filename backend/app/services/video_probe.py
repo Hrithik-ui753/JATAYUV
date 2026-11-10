@@ -62,7 +62,10 @@ class VideoMetadata:
     ffprobe_json: Dict[str, Any]
     probe_duration_method: Optional[str] = None
     truncated_probe: bool = False
+<<<<<<< HEAD
     probe_backend: str = "ffprobe"
+=======
+>>>>>>> origin/main
 
 
 @dataclass
@@ -151,6 +154,7 @@ def _parse_rational(text: Optional[str]) -> Optional[float]:
     return num / den
 
 
+<<<<<<< HEAD
 def _probe_with_pyav(path: str) -> VideoMetadata:
     """Read container/stream metadata through PyAV.
 
@@ -207,6 +211,8 @@ def _probe_with_pyav(path: str) -> VideoMetadata:
     )
 
 
+=======
+>>>>>>> origin/main
 def probe_video(path: str) -> VideoMetadata:
     """Inspect container and streams without decoding frames."""
     if not os.path.isfile(path):
@@ -216,9 +222,12 @@ def probe_video(path: str) -> VideoMetadata:
     if size == 0:
         raise ValueError("Video file is empty")
 
+<<<<<<< HEAD
     if shutil.which("ffprobe") is None:
         return _probe_with_pyav(path)
 
+=======
+>>>>>>> origin/main
     returncode, stderr_text, parsed = _run_ffprobe(path)
 
     fmt = parsed.get("format", {})
@@ -335,7 +344,10 @@ def _metadata_to_dict(m: VideoMetadata) -> Dict[str, Any]:
         "has_video": m.has_video,
         "probe_duration_method": m.probe_duration_method,
         "truncated_probe": m.truncated_probe,
+<<<<<<< HEAD
         "probe_backend": m.probe_backend,
+=======
+>>>>>>> origin/main
     }
 
 

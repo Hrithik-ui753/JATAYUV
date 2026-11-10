@@ -6,18 +6,40 @@ End-to-end tests covering the full JATAYUV-AI data flow:
   1.  User registration and login
   2.  Project CRUD
   3.  Image upload (real JPEG fixtures)
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+  4.  Depth estimation inference + artifact verification
+  5.  Semantic segmentation inference + artifact verification
+  6.  Damage assessment (paired images) + artifact verification
+  7.  Change detection (paired images) + artifact verification
+  8.  3D reconstruction + point-cloud verification
+=======
+>>>>>>> origin/main
   4.  Depth estimation: explicit unavailability without a verified checkpoint
   5.  Semantic segmentation: explicit unavailability, no random-weight output
   6.  Damage assessment: explicit unavailability, no fabricated classes
   7.  Change detection (paired images) + artifact verification
   8.  3D reconstruction: explicit unavailability without COLMAP, no fake PLY
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
   9.  Job listing and status polling
   10. Job cancellation (queued/pending jobs)
   11. Job ownership — another user cannot access another user's jobs
   12. Duplicate submission protection (re-trigger should return cached result)
   13. Invalid file upload rejection (non-image bytes)
   14. Job failure handling (inference on missing file)
+<<<<<<< HEAD
   15. Missing-model handling: explicit errors only (no baseline/random fallback)
+=======
+<<<<<<< HEAD
+  15. Missing-model graceful fallback (depth service uses baseline CNN)
+=======
+  15. Missing-model handling: explicit errors only (no baseline/random fallback)
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
   16. Artifact download byte-level verification
 
 Tests run against an **in-process FastAPI TestClient** backed by a SQLite
@@ -355,11 +377,21 @@ class TestImageUpload:
 # ===========================================================================
 
 class TestDepthEstimation:
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+    """Upload a real image, trigger depth inference, verify output artifacts."""
+=======
+>>>>>>> origin/main
     """Depth inference requires a verified checkpoint; its absence fails explicitly.
 
     No random-weight or toy fallback exists, so with no checkpoint installed the endpoint
     must report ``unavailable`` and persist nothing.
     """
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 
     def _setup(self) -> tuple:
         """Returns (token, project_id, image_id, image_file_path)."""
@@ -382,6 +414,47 @@ class TestDepthEstimation:
         image_file_path = up_resp.json()[0]["file_path"]
         return token, project_id, image_id, image_file_path
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+    def test_depth_inference_completes(self):
+        token, project_id, image_id, file_path = self._setup()
+        resp = client.post("/api/v1/analysis/depth", headers=_auth(token), json={"image_id": image_id})
+        assert resp.status_code == 200, f"Depth failed: {resp.text}"
+        data = resp.json()
+        assert "depth_map_path" in data
+        assert "colormap_path" in data
+        # Relative depth: metric fields are explicitly null, relative stats are present.
+        assert data.get("depth_type") == "relative"
+        assert data.get("min_depth_m") is None
+        assert data.get("max_depth_m") is None
+        assert data.get("relative_max") is not None
+
+    def test_depth_artifact_exists_on_disk(self):
+        token, project_id, image_id, _ = self._setup()
+        resp = client.post("/api/v1/analysis/depth", headers=_auth(token), json={"image_id": image_id})
+        assert resp.status_code == 200
+        depth_path = resp.json()["depth_map_path"]
+        assert os.path.isfile(depth_path), f"Depth map not saved to disk: {depth_path}"
+
+    def test_depth_result_retrievable_by_image_id(self):
+        token, project_id, image_id, _ = self._setup()
+        client.post("/api/v1/analysis/depth", headers=_auth(token), json={"image_id": image_id})
+        get_resp = client.get(f"/api/v1/analysis/depth/{image_id}", headers=_auth(token))
+        assert get_resp.status_code == 200
+        assert get_resp.json()["image_id"] == image_id
+
+    def test_depth_duplicate_returns_cached(self):
+        """Re-triggering depth on the same image_id should not create a duplicate."""
+        token, project_id, image_id, _ = self._setup()
+        r1 = client.post("/api/v1/analysis/depth", headers=_auth(token), json={"image_id": image_id})
+        r2 = client.post("/api/v1/analysis/depth", headers=_auth(token), json={"image_id": image_id})
+        assert r1.status_code == 200
+        assert r2.status_code == 200
+        # Both should succeed; if caching implemented, IDs match
+        assert r1.json()["image_id"] == r2.json()["image_id"]
+=======
+>>>>>>> origin/main
     def _force_missing_checkpoint(self, monkeypatch, tmp_path):
         import dataclasses
 
@@ -429,6 +502,10 @@ class TestDepthEstimation:
             self._clear_cache()
         get_resp = client.get(f"/api/v1/analysis/depth/{image_id}", headers=_auth(token))
         assert get_resp.status_code == 404
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 
     def test_depth_nonexistent_image_returns_404(self):
         token = _register_and_login("depth_404_user@jatayuv.ai")
@@ -460,6 +537,37 @@ class TestSemanticSegmentation:
             )
         return token, project_id, up_resp.json()[0]["id"]
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+    def test_segmentation_completes(self):
+        token, project_id, image_id = self._setup()
+        resp = client.post("/api/v1/analysis/segmentation", headers=_auth(token), json={"image_id": image_id})
+        assert resp.status_code == 200, f"Segmentation failed: {resp.text}"
+        data = resp.json()
+        assert "mask_path" in data
+        assert "class_distribution" in data
+        # Class distribution must contain the 7 aerial classes
+        dist = data["class_distribution"]
+        assert isinstance(dist, dict)
+        assert len(dist) > 0
+
+    def test_segmentation_mask_on_disk(self):
+        token, project_id, image_id = self._setup()
+        resp = client.post("/api/v1/analysis/segmentation", headers=_auth(token), json={"image_id": image_id})
+        assert resp.status_code == 200
+        mask_path = resp.json()["mask_path"]
+        assert os.path.isfile(mask_path), f"Mask not on disk: {mask_path}"
+
+    def test_segmentation_overlay_on_disk(self):
+        token, project_id, image_id = self._setup()
+        resp = client.post("/api/v1/analysis/segmentation", headers=_auth(token), json={"image_id": image_id})
+        assert resp.status_code == 200
+        overlay_path = resp.json().get("overlay_path")
+        if overlay_path:
+            assert os.path.isfile(overlay_path), f"Overlay not on disk: {overlay_path}"
+=======
+>>>>>>> origin/main
     def test_segmentation_without_checkpoint_returns_503(self, monkeypatch, tmp_path):
         """No verified checkpoint => explicit unavailability, never random predictions."""
         from backend.app.services.segmentation import segmentation_service
@@ -490,6 +598,10 @@ class TestSemanticSegmentation:
 
         assert not os.path.exists(os.path.join(settings.PROCESSED_DIR, f"segmask_{image_id}.png"))
         assert not os.path.exists(os.path.join(settings.PROCESSED_DIR, f"segoverlay_{image_id}.png"))
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 
 
 # ===========================================================================
@@ -530,6 +642,27 @@ class TestDamageAssessment:
 
         return token, project_id, pre_id, post_id
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+    def test_damage_assessment_completes(self):
+        token, project_id, pre_id, post_id = self._setup()
+        resp = client.post("/api/v1/analysis/damage", headers=_auth(token), json={
+            "pre_image_id": pre_id,
+            "post_image_id": post_id,
+        })
+        assert resp.status_code == 200, f"Damage failed: {resp.text}"
+        data = resp.json()
+        assert "damage_overlay_path" in data
+        assert "total_buildings" in data
+        assert "counts_by_level" in data
+        assert "damage_percentage" in data
+        assert 0.0 <= data["damage_percentage"] <= 100.0
+
+    def test_damage_overlay_on_disk(self):
+        token, project_id, pre_id, post_id = self._setup()
+=======
+>>>>>>> origin/main
     def test_damage_without_checkpoint_returns_503(self, monkeypatch, tmp_path):
         """No verified damage checkpoint => explicit unavailability, no fake classes."""
         from backend.app.services.damage_assessment import damage_service
@@ -538,10 +671,22 @@ class TestDamageAssessment:
         monkeypatch.setattr(
             damage_service, "_checkpoint_path", str(tmp_path / "absent_damage.pth")
         )
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
         resp = client.post("/api/v1/analysis/damage", headers=_auth(token), json={
             "pre_image_id": pre_id,
             "post_image_id": post_id,
         })
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+        assert resp.status_code == 200
+        overlay_path = resp.json()["damage_overlay_path"]
+        assert os.path.isfile(overlay_path), f"Damage overlay not on disk: {overlay_path}"
+=======
+>>>>>>> origin/main
         assert resp.status_code == 503, resp.text
         detail = resp.json()["detail"]
         assert detail["status"] == "unavailable"
@@ -565,6 +710,10 @@ class TestDamageAssessment:
         from backend.app.core.config import settings
 
         assert not os.path.exists(os.path.join(settings.PROCESSED_DIR, f"damage_{post_id}.png"))
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 
     def test_damage_missing_pre_image_returns_404(self):
         token = _register_and_login("damage_404_user@jatayuv.ai")
@@ -640,7 +789,15 @@ class TestChangeDetection:
 # ===========================================================================
 
 class TestReconstruction3D:
+<<<<<<< HEAD
     """Reconstruction only reports success when COLMAP produced verified artifacts."""
+=======
+<<<<<<< HEAD
+    """Upload ≥2 images, trigger reconstruction, verify PLY/OBJ artifacts."""
+=======
+    """Reconstruction only reports success when COLMAP produced verified artifacts."""
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 
     def _setup(self, n_images: int = 3) -> tuple:
         token = _register_and_login("recon_user@jatayuv.ai")
@@ -664,6 +821,25 @@ class TestReconstruction3D:
 
         return token, project_id, image_ids
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+    def test_reconstruction_completes_with_3_images(self):
+        token, project_id, image_ids = self._setup(n_images=3)
+        resp = client.post("/api/v1/reconstruction/3d", headers=_auth(token), json={
+            "project_id": project_id,
+            "image_ids": image_ids,
+        })
+        assert resp.status_code == 200, f"Reconstruction failed: {resp.text}"
+        data = resp.json()
+        assert "pointcloud_ply_path" in data
+        assert "num_points" in data
+        assert data["num_points"] > 0
+
+    def test_reconstruction_ply_on_disk(self):
+        token, project_id, image_ids = self._setup(n_images=3)
+=======
+>>>>>>> origin/main
     def _force_no_colmap(self, monkeypatch):
         from backend.app.services import reconstruction as reconstruction_module
 
@@ -672,10 +848,25 @@ class TestReconstruction3D:
     def test_reconstruction_without_colmap_returns_503(self, monkeypatch):
         token, project_id, image_ids = self._setup(n_images=3)
         self._force_no_colmap(monkeypatch)
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
         resp = client.post("/api/v1/reconstruction/3d", headers=_auth(token), json={
             "project_id": project_id,
             "image_ids": image_ids,
         })
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+        assert resp.status_code == 200
+        ply_path = resp.json()["pointcloud_ply_path"]
+        assert os.path.isfile(ply_path), f"PLY not on disk: {ply_path}"
+
+    def test_reconstruction_requires_minimum_2_images(self):
+        """Must reject reconstruction with 0 images."""
+=======
+>>>>>>> origin/main
         assert resp.status_code == 503, resp.text
         detail = resp.json()["detail"]
         assert detail["status"] == "unavailable"
@@ -721,6 +912,10 @@ class TestReconstruction3D:
         assert resp.json()["detail"]["status"] == "invalid_input"
 
     def test_reconstruction_without_images_returns_400(self):
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
         token = _register_and_login("recon_noimages@jatayuv.ai")
         proj_resp = client.post("/api/v1/projects", headers=_auth(token), json={
             "name": "Empty Recon Project", "description": "d", "location_name": "l"
@@ -732,6 +927,22 @@ class TestReconstruction3D:
         })
         assert resp.status_code == 400
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+    def test_reconstruction_result_retrievable(self):
+        token, project_id, image_ids = self._setup(n_images=2)
+        client.post("/api/v1/reconstruction/3d", headers=_auth(token), json={
+            "project_id": project_id,
+            "image_ids": image_ids,
+        })
+        get_resp = client.get(f"/api/v1/reconstruction/3d/{project_id}", headers=_auth(token))
+        assert get_resp.status_code == 200
+        assert get_resp.json()["project_id"] == project_id
+
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 
 # ===========================================================================
 # 9. Job Monitoring
@@ -817,8 +1028,18 @@ class TestJobMonitoring:
 class TestJobCancellation:
     """Cancel a pending job; verify terminal state transition."""
 
+<<<<<<< HEAD
     def test_cancel_terminal_job_returns_409(self):
         """Cancelling a job that already reached a terminal state returns 409 Conflict."""
+=======
+<<<<<<< HEAD
+    def test_cancel_completed_job_returns_409(self):
+        """Cancelling an already-completed job should return 409 Conflict."""
+=======
+    def test_cancel_terminal_job_returns_409(self):
+        """Cancelling a job that already reached a terminal state returns 409 Conflict."""
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
         token = _register_and_login("cancel_user@jatayuv.ai")
         proj_resp = client.post("/api/v1/projects", headers=_auth(token), json={
             "name": "Cancel Test Project", "description": "d", "location_name": "l"
@@ -833,10 +1054,22 @@ class TestJobCancellation:
             )
         image_id = up_resp.json()[0]["id"]
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+        # Trigger and complete a depth job
+        depth_resp = client.post("/api/v1/analysis/depth", headers=_auth(token), json={"image_id": image_id})
+        assert depth_resp.status_code == 200
+=======
+>>>>>>> origin/main
         # Trigger a depth job. Without a verified checkpoint it fails explicitly, which
         # is still a terminal state (the cancel endpoint must report 409).
         depth_resp = client.post("/api/v1/analysis/depth", headers=_auth(token), json={"image_id": image_id})
         assert depth_resp.status_code in (200, 503)
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 
         # Get the job
         jobs_resp = client.get(f"/api/v1/jobs/projects/{project_id}", headers=_auth(token))
@@ -921,7 +1154,15 @@ class TestJobOwnership:
 # ===========================================================================
 
 class TestModelGracefulFallback:
+<<<<<<< HEAD
     """Without a verified checkpoint the depth service must fail loudly."""
+=======
+<<<<<<< HEAD
+    """Depth service must work even without the real Depth Anything V2 checkpoint."""
+=======
+    """Without a verified checkpoint the depth service must fail loudly."""
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 
     def test_depth_service_exposes_verified_models_only(self):
         """No silent CNN fallback: only verified Depth Anything V2 Small checkpoints."""
@@ -969,7 +1210,15 @@ class TestCompleteWorkflow:
       → Damage → Change → 3D Reconstruction → Retrieve All Results
     """
 
+<<<<<<< HEAD
     def test_full_workflow(self, monkeypatch, tmp_path):
+=======
+<<<<<<< HEAD
+    def test_full_workflow(self):
+=======
+    def test_full_workflow(self, monkeypatch, tmp_path):
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
         # --- Step 1: Register + Login ---
         email = "e2e_workflow@jatayuv.ai"
         token = _register_and_login(email, "WorkflowPass99!")
@@ -998,6 +1247,23 @@ class TestCompleteWorkflow:
             assert up.status_code == 201
             image_ids.append(up.json()[0]["id"])
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+        # --- Step 4: Depth Estimation on first image ---
+        depth_resp = client.post("/api/v1/analysis/depth", headers=_auth(token), json={"image_id": image_ids[0]})
+        assert depth_resp.status_code == 200
+        depth_data = depth_resp.json()
+        assert os.path.isfile(depth_data["depth_map_path"])
+
+        # --- Step 5: Segmentation on second image ---
+        seg_resp = client.post("/api/v1/analysis/segmentation", headers=_auth(token), json={"image_id": image_ids[1]})
+        assert seg_resp.status_code == 200
+        assert os.path.isfile(seg_resp.json()["mask_path"])
+
+        # --- Step 6: Damage Assessment (images 1 and 2 as pre/post) ---
+=======
+>>>>>>> origin/main
         # Verification is unavailable in this environment: force the missing-checkpoint
         # path so the assertions below are deterministic, not environment dependent.
         from backend.app.services import depth_engine
@@ -1033,14 +1299,31 @@ class TestCompleteWorkflow:
         assert seg_resp.json()["detail"]["service"] == "semantic_segmentation"
 
         # --- Step 6: Damage Assessment reports unavailability ---
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
         dmg_resp = client.post("/api/v1/analysis/damage", headers=_auth(token), json={
             "pre_image_id": image_ids[0],
             "post_image_id": image_ids[1],
         })
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+        assert dmg_resp.status_code == 200
+        assert os.path.isfile(dmg_resp.json()["damage_overlay_path"])
+
+        # --- Step 7: Change Detection (images 2 and 3) ---
+=======
+>>>>>>> origin/main
         assert dmg_resp.status_code == 503
         assert dmg_resp.json()["detail"]["service"] == "damage_assessment"
 
         # --- Step 7: Change Detection (model-free) completes with real artifacts ---
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
         chg_resp = client.post("/api/v1/analysis/change", headers=_auth(token), json={
             "before_image_id": image_ids[1],
             "after_image_id": image_ids[2],
@@ -1048,11 +1331,39 @@ class TestCompleteWorkflow:
         assert chg_resp.status_code == 200
         assert os.path.isfile(chg_resp.json()["diff_mask_path"])
 
+<<<<<<< HEAD
         # --- Step 8: 3D Reconstruction reports the missing backend ---
+=======
+<<<<<<< HEAD
+        # --- Step 8: 3D Reconstruction ---
+=======
+        # --- Step 8: 3D Reconstruction reports the missing backend ---
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
         recon_resp = client.post("/api/v1/reconstruction/3d", headers=_auth(token), json={
             "project_id": project_id,
             "image_ids": image_ids,
         })
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+        assert recon_resp.status_code == 200
+        recon_data = recon_resp.json()
+        assert os.path.isfile(recon_data["pointcloud_ply_path"])
+
+        # --- Step 9: Retrieve all results ---
+        get_depth = client.get(f"/api/v1/analysis/depth/{image_ids[0]}", headers=_auth(token))
+        assert get_depth.status_code == 200
+
+        get_seg = client.get(f"/api/v1/analysis/segmentation/{image_ids[1]}", headers=_auth(token))
+        assert get_seg.status_code == 200
+
+        get_recon = client.get(f"/api/v1/reconstruction/3d/{project_id}", headers=_auth(token))
+        assert get_recon.status_code == 200
+
+        # --- Step 10: Job listing shows all submitted jobs ---
+=======
+>>>>>>> origin/main
         assert recon_resp.status_code == 503
         assert recon_resp.json()["detail"]["status"] == "unavailable"
 
@@ -1067,11 +1378,24 @@ class TestCompleteWorkflow:
         ).status_code == 404
 
         # --- Step 10: Job listing distinguishes completed from failed ---
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
         jobs_resp = client.get(f"/api/v1/jobs/projects/{project_id}", headers=_auth(token))
         assert jobs_resp.status_code == 200
         jobs = jobs_resp.json()
         assert len(jobs) >= 4  # depth + segmentation + damage + change + reconstruction
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+        # --- Verify all jobs completed ---
+        for job in jobs:
+            assert job["status"] == "completed", (
+                f"Job {job['id']} ({job['job_type']}) ended in status: {job['status']}"
+=======
+>>>>>>> origin/main
         by_type = {}
         for job in jobs:
             by_type.setdefault(job["job_type"], set()).add(job["status"])
@@ -1080,6 +1404,10 @@ class TestCompleteWorkflow:
         for job_type in ("depth_estimation", "semantic_segmentation", "damage_assessment", "reconstruction_3d"):
             assert by_type.get(job_type) == {"failed"}, (
                 f"{job_type} must be recorded as failed when its model/backend is unavailable"
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
             )
 
 

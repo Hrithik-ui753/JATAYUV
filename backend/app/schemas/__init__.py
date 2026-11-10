@@ -12,11 +12,24 @@ from backend.app.schemas.analysis import (
     ChangeTriggerRequest,
     ChangeResponse,
 )
+<<<<<<< HEAD
 from backend.app.schemas.reconstruction import (
     ReconstructionTriggerRequest,
     ReconstructionResponse,
     MissionReconstructionResponse,
 )
+=======
+<<<<<<< HEAD
+from backend.app.schemas.reconstruction import ReconstructionTriggerRequest, ReconstructionResponse
+=======
+from backend.app.schemas.reconstruction import ReconstructionResponse
+
+# Legacy placeholder kept only so existing app startup wiring doesn't break.
+# In current code ReconstructionTriggerRequest is not implemented; if it is needed
+# it should be added here with an explicit definition.
+ReconstructionTriggerRequest = None  # type: ignore[assignment]
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
 from backend.app.schemas.job import JobResponse, JobLogResponse
 from backend.app.schemas.ai_model import AIModelVersionResponse
 
@@ -43,7 +56,11 @@ __all__ = [
     "DamageResponse",
     "ChangeTriggerRequest",
     "ChangeResponse",
+<<<<<<< HEAD
     "ReconstructionTriggerRequest",
+=======
+    "ReconstructionTriggerRequest",  # legacy; no longer defined in reconstruction.py after refactor
+>>>>>>> 0400f2f (p5-udpated)
     "ReconstructionResponse",
     "MissionReconstructionResponse",
     "AIModelVersionResponse",

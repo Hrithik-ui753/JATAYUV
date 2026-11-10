@@ -80,6 +80,11 @@ class JobRepository:
             return self.update_status(job, "cancelled")
         return job
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> origin/main
     def transition_to_terminal(self, job: Job, status: str, error_message: str = None) -> Job:
         """Move a job to a terminal state safely. Terminal jobs cannot transition back to running."""
         terminal = {"completed", "failed", "cancelled"}
@@ -103,3 +108,7 @@ class JobRepository:
         self.db.refresh(job)
         return job
 
+<<<<<<< HEAD
+=======
+>>>>>>> 0400f2f (p5-udpated)
+>>>>>>> origin/main
