@@ -14,12 +14,14 @@ import {
   Navigation, 
   Crosshair,
   ShieldCheck,
-  Zap
+  Zap,
+  Sparkles
 } from "lucide-react";
 
 export function CinematicDroneHero() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [cameraMode, setCameraMode] = useState<"tactical" | "chase" | "sensor" | "wide">("tactical");
+  const [superClarity, setSuperClarity] = useState<boolean>(true);
   const [isScanning, setIsScanning] = useState(true);
   const [showFlightPath, setShowFlightPath] = useState(true);
   const [telemetry, setTelemetry] = useState({
@@ -34,9 +36,12 @@ export function CinematicDroneHero() {
     pointsCollected: 148290,
   });
 
-  // Keep ref to control camera transitions
+  // Keep ref to control camera transitions & rendering
   const controlsRef = useRef<OrbitControls | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const superClarityRef = useRef<boolean>(superClarity);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -48,7 +53,9 @@ export function CinematicDroneHero() {
     // --- 1. Scene, Camera, Renderer ---
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x060908);
-    scene.fog = new THREE.FogExp2(0x060908, 0.018);
+    // Ultra-clear distance fog (avoids milky blur across the 3D map)
+    scene.fog = new THREE.Fog(0x060908, 90, 220);
+    sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(
       45,
@@ -65,12 +72,14 @@ export function CinematicDroneHero() {
       alpha: false,
     });
     renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    renderer.toneMappingExposure = 1.32;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -82,10 +91,10 @@ export function CinematicDroneHero() {
     controlsRef.current = controls;
 
     // --- 2. Lighting ---
-    const ambientLight = new THREE.AmbientLight(0x0d281e, 1.8);
+    const ambientLight = new THREE.AmbientLight(0x0d281e, 2.0);
     scene.add(ambientLight);
 
-    const sunLight = new THREE.DirectionalLight(0xa7f3d0, 2.8);
+    const sunLight = new THREE.DirectionalLight(0xbbf7d0, 3.2);
     sunLight.position.set(30, 45, 20);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
@@ -98,13 +107,13 @@ export function CinematicDroneHero() {
     sunLight.shadow.camera.bottom = -25;
     scene.add(sunLight);
 
-    const rimLight = new THREE.DirectionalLight(0x10b981, 1.4);
+    const rimLight = new THREE.DirectionalLight(0x34d399, 1.8);
     rimLight.position.set(-25, 20, -25);
     scene.add(rimLight);
 
-    // --- 3. Procedural 3D Terrain Environment ---
+    // --- 3. Procedural 3D Terrain Environment (High Resolution Super Clarity) ---
     const terrainSize = 70;
-    const terrainSegments = 70;
+    const terrainSegments = 140; // Double resolution (4x vertex density for razor sharpness)
     const terrainGeo = new THREE.PlaneGeometry(terrainSize, terrainSize, terrainSegments, terrainSegments);
     terrainGeo.rotateX(-Math.PI / 2);
 
@@ -125,17 +134,26 @@ export function CinematicDroneHero() {
 
       pos.setY(i, elevation);
 
-      // Color mapping based on elevation (Deep forest dark to emerald peaks)
+      // High-contrast tactical elevation ramp (Dark forest basin -> vivid emerald -> electric peak)
       const normY = THREE.MathUtils.clamp((elevation + 4) / 9, 0, 1);
-      const c1 = new THREE.Color(0x07120d); // deep valley
-      const c2 = new THREE.Color(0x0e2e21); // mid slope
-      const c3 = new THREE.Color(0x10b981); // ridge peak
+      const c1 = new THREE.Color(0x0a1f16); // deep valley
+      const c2 = new THREE.Color(0x104d35); // mid slope
+      const c3 = new THREE.Color(0x10b981); // emerald terrace
+      const c4 = new THREE.Color(0x00f5a0); // peak ridge
       const cFinal = new THREE.Color();
 
-      if (normY < 0.5) {
-        cFinal.lerpColors(c1, c2, normY * 2);
+      if (normY < 0.4) {
+        cFinal.lerpColors(c1, c2, normY / 0.4);
+      } else if (normY < 0.8) {
+        cFinal.lerpColors(c2, c3, (normY - 0.4) / 0.4);
       } else {
-        cFinal.lerpColors(c2, c3, (normY - 0.5) * 2);
+        cFinal.lerpColors(c3, c4, (normY - 0.8) / 0.2);
+      }
+
+      // Topographic contour line accent for super clarity
+      const contourMod = Math.abs((elevation + 4) % 0.85 - 0.425);
+      if (contourMod < 0.04) {
+        cFinal.addScalar(0.12);
       }
 
       colors[i * 3] = cFinal.r;
@@ -148,27 +166,27 @@ export function CinematicDroneHero() {
 
     const terrainMat = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.85,
-      metalness: 0.15,
-      flatShading: true,
+      roughness: 0.65,
+      metalness: 0.25,
+      flatShading: false, // Smooth continuous normals for high definition
     });
     const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
     terrainMesh.receiveShadow = true;
     scene.add(terrainMesh);
 
-    // Topographic Wireframe Overlay
+    // Topographic Wireframe Overlay (Razor-Sharp High Contrast)
     const wireMat = new THREE.MeshBasicMaterial({
-      color: 0x10b981,
+      color: 0x34d399,
       wireframe: true,
       transparent: true,
-      opacity: 0.12,
+      opacity: 0.26,
     });
     const terrainWire = new THREE.Mesh(terrainGeo, wireMat);
     terrainWire.position.y += 0.02;
     scene.add(terrainWire);
 
     // Coordinate Grid Base
-    const gridHelper = new THREE.GridHelper(70, 35, 0x10b981, 0x0c251b);
+    const gridHelper = new THREE.GridHelper(70, 70, 0x10b981, 0x0e2e21);
     gridHelper.position.y = -4.2;
     scene.add(gridHelper);
 
@@ -487,11 +505,12 @@ export function CinematicDroneHero() {
       }));
     }, 400);
 
-    // --- 9. Window Resize Handling ---
+    // --- 9. Window Resize Handling (Super Clarity DPI preserved) ---
     const handleResize = () => {
       if (!container) return;
       camera.aspect = container.clientWidth / container.clientHeight;
       camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, superClarityRef.current ? 3 : 2));
       renderer.setSize(container.clientWidth, container.clientHeight);
     };
     window.addEventListener("resize", handleResize);
@@ -533,6 +552,21 @@ export function CinematicDroneHero() {
       }
     };
   }, []);
+
+  const toggleSuperClarity = () => {
+    const next = !superClarity;
+    setSuperClarity(next);
+    superClarityRef.current = next;
+    const renderer = rendererRef.current;
+    const scene = sceneRef.current;
+    if (renderer && containerRef.current) {
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, next ? 3 : 1.5));
+      renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
+    }
+    if (scene) {
+      scene.fog = next ? new THREE.Fog(0x060908, 90, 220) : new THREE.Fog(0x060908, 40, 110);
+    }
+  };
 
   // Camera preset transitions
   const transitionCamera = (mode: "tactical" | "chase" | "sensor" | "wide") => {
@@ -608,6 +642,22 @@ export function CinematicDroneHero() {
               {mode}
             </button>
           ))}
+          <div className="h-4 w-[1px] bg-emerald-500/20 my-auto mx-1" />
+          <button
+            onClick={toggleSuperClarity}
+            title={superClarity ? "Super Clarity 4K active (Click to reduce)" : "Activate Super Clarity 4K rendering"}
+            className={`px-2.5 py-1 text-xs font-mono uppercase rounded transition-all flex items-center gap-1.5 ${
+              superClarity
+                ? "bg-emerald-500/30 text-emerald-300 border border-emerald-400 font-bold shadow-[0_0_10px_rgba(16,185,129,0.25)]"
+                : "text-muted-foreground hover:text-white hover:bg-forest-800/60"
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">SUPER CLARITY</span>
+            <span className="text-[10px] bg-emerald-950/80 px-1 py-0.5 rounded border border-emerald-500/30">
+              {superClarity ? "4K HD" : "OFF"}
+            </span>
+          </button>
         </div>
       </div>
 

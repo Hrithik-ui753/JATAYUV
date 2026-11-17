@@ -5,16 +5,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Compass,
-  Layers,
-  ShieldAlert,
-  Box,
   FolderKanban,
   Activity,
   User as UserIcon,
-  Bell,
   ArrowLeft,
-  Settings,
-  Radio
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -75,13 +69,13 @@ export function Header() {
 
         {/* Right Action Icons & Profile */}
         <div className="flex items-center gap-3 font-mono text-xs">
-          {/* Back to Cinematic Landing */}
+          {/* Back to Landing */}
           <Link
             href="/"
-            className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded bg-forest-900/80 border border-emerald-500/20 text-muted-foreground hover:text-emerald-300 hover:border-emerald-500/40 transition-all text-[11px]"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded bg-forest-900/80 border border-emerald-500/20 text-muted-foreground hover:text-emerald-300 hover:border-emerald-500/40 transition-all text-[11px]"
           >
             <ArrowLeft className="w-3 h-3" />
-            <span>Cinematic Hero</span>
+            <span>Landing Page</span>
           </Link>
 
           {/* Engine Status */}

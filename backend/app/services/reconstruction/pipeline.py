@@ -90,6 +90,7 @@ class ReconstructionPipeline:
         pose_xyz: Optional[List[float]] = None,
         pose_rotation: Optional[List[List[float]]] = None,
         dynamic_mask_path: Optional[str] = None,
+        scale_factor: Optional[float] = None,
     ) -> Optional[o3d.geometry.PointCloud]:
         """Create an Open3D point cloud from one depth map and one frame.
 
@@ -110,8 +111,11 @@ class ReconstructionPipeline:
         depth_meta = self._depth_metadata_for_frame(frame_path)
         depth_type = depth_meta.get("depth_type", "relative") if depth_meta else "relative"
 
-        if depth_type == "relative":
+        if depth_type == "relative" and scale_factor is None:
             return None
+
+        if scale_factor is not None and scale_factor > 0:
+            depth = depth * scale_factor
 
         height, width = depth.shape
         fx = float(camera_intrinsics.get("fx", 0))
@@ -135,17 +139,16 @@ class ReconstructionPipeline:
             mask = np.array(o3d.io.read_image(o3d.geometry.Image(dynamic_mask_path)))
             if mask.shape[:2] == (height, width):
                 dyn_valid = mask.reshape(-1) < 128
-                keep = valid.reshape(-1) & dyn_valid
                 pts = pts[dyn_valid[valid.reshape(-1)]]
 
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(pts)
-        if pose_xyz and pose_rotation:
+        if pose_xyz is not None and pose_rotation is not None:
             import numpy as np
-            R = o3d.geometry.get_rotation_matrix_from_numpy(np.array(pose_rotation))
-            T = np.array(pose_xyz)
-            pcd.transform(R)
-            pcd.translate(T)
+            T_mat = np.eye(4, dtype=np.float64)
+            T_mat[:3, :3] = np.array(pose_rotation, dtype=np.float64)
+            T_mat[:3, 3] = np.array(pose_xyz, dtype=np.float64)
+            pcd.transform(T_mat)
         return pcd
 
     # ------------------------------------------------------------------ merging

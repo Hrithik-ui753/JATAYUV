@@ -144,7 +144,7 @@ def iter_extracted_frames(
             next_sample_at = 0.0
 
         for frame in container.decode(video=0):
-            if frame.type != "video":
+            if not isinstance(frame, av.VideoFrame):
                 continue
 
             if config.max_frames is not None and saved_count >= config.max_frames:

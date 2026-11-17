@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 """COLMAP photogrammetry runner.
 
 P0 integrity contract
@@ -17,11 +16,6 @@ P0 integrity contract
 """
 from __future__ import annotations
 
-=======
-<<<<<<< HEAD
-import os
-import subprocess
->>>>>>> origin/main
 import json
 import os
 import re
@@ -146,145 +140,6 @@ class ReconstructionService:
 
     # --------------------------------------------------------------- workspace
     def _prepare_workspace(self, image_paths: List[str]) -> str:
-<<<<<<< HEAD
-=======
-        """Create a temporary COLMAP project directory and copy images.
-        Returns the absolute path to the workspace.
-        """
-=======
-"""COLMAP photogrammetry runner.
-
-P0 integrity contract
----------------------
-* Every external command is validated (executable found, arguments present, exit
-  status checked) before its output is trusted.
-* The dense stage follows the documented COLMAP order:
-  ``image_undistorter`` -> ``patch_match_stereo`` -> ``stereo_fusion``.
-* Reconstruction statistics (point count, camera count, mean reprojection error)
-  are parsed from COLMAP's own ``model_analyzer`` output. If they cannot be
-  determined the run fails; no placeholder accuracy value is ever written.
-* If COLMAP is not installed the service raises :class:`ColmapUnavailable`.
-* This module has not been executed against a real COLMAP install in this
-  environment; it makes no claim that reconstruction works until it is run with
-  real overlapping imagery.
-"""
-from __future__ import annotations
-
-import json
-import os
-import re
-import shutil
-import subprocess
-import uuid
-from typing import Any, Dict, List, Optional
-
-from ..core.config import settings
-from ..workers.celery_app import celery_app
-
-
-class ColmapError(RuntimeError):
-    """Raised when a COLMAP step fails or produces an invalid/absent artifact."""
-
-    status = "failed"
-
-    def __init__(self, message: str, *, step: Optional[str] = None, log_tail: str = "") -> None:
-        super().__init__(message)
-        self.step = step
-        self.log_tail = log_tail
-
-
-class ColmapUnavailable(ColmapError):
-    """Raised when no COLMAP executable can be located."""
-
-    status = "unavailable"
-
-
-# COLMAP needs at least two registered images to triangulate anything.
-MIN_IMAGES = 2
-
-
-def _tail(text: str, limit: int = 1500) -> str:
-    text = (text or "").strip()
-    return text[-limit:] if len(text) > limit else text
-
-
-def _parse_model_analyzer(output: str) -> Dict[str, Any]:
-    """Extract real reconstruction statistics from ``colmap model_analyzer`` output."""
-    def _int(pattern: str) -> Optional[int]:
-        match = re.search(pattern, output, re.MULTILINE)
-        if not match:
-            return None
-        try:
-            return int(match.group(1))
-        except (TypeError, ValueError):
-            return None
-
-    points = _int(r"^\s*Points:\s*(\d+)\s*$")
-    cameras = _int(r"^\s*Cameras:\s*(\d+)\s*$")
-    registered = _int(r"^\s*Registered images:\s*(\d+)\s*$")
-
-    error_match = re.search(
-        r"Mean reprojection error:\s*([0-9]+(?:\.[0-9]+)?(?:[eE][+-]?\d+)?)\s*px",
-        output,
-        re.MULTILINE,
-    )
-    reprojection_error = float(error_match.group(1)) if error_match else None
-
-    return {
-        "num_points": points,
-        "camera_count": cameras,
-        "registered_images": registered,
-        "reprojection_error_px": reprojection_error,
-    }
-
-
-class ReconstructionService:
-    """Executes the COLMAP structure-from-motion / multi-view-stereo pipeline."""
-
-    def __init__(self) -> None:
-        self.colmap_exe = self._detect_colmap()
-        self.base_workspace = settings.RECONSTRUCTION_DIR
-        os.makedirs(self.base_workspace, exist_ok=True)
-
-    # ------------------------------------------------------------- environment
-    @staticmethod
-    def _detect_colmap() -> Optional[str]:
-        """Locate the COLMAP binary (``COLMAP_EXE`` env var, then ``PATH``)."""
-        configured = os.environ.get("COLMAP_EXE", "").strip()
-        if configured:
-            if os.path.isfile(configured):
-                return configured
-            found = shutil.which(configured)
-            if found:
-                return found
-        return shutil.which("colmap")
-
-    def executable_status(self) -> Dict[str, Any]:
-        return {
-            "backend": "colmap",
-            "executable": self.colmap_exe,
-            "available": bool(self.colmap_exe),
-            "min_images": MIN_IMAGES,
-        }
-
-    def _require_colmap(self) -> str:
-        if not self.colmap_exe:
-            raise ColmapUnavailable(
-                "COLMAP executable not found. Install COLMAP and put it on PATH (or set "
-                "COLMAP_EXE) to enable real 3D reconstruction. No synthetic geometry is "
-                "produced in its absence.",
-                step="detect",
-            )
-        if not (os.path.isfile(self.colmap_exe) or shutil.which(self.colmap_exe)):
-            raise ColmapUnavailable(
-                f"Configured COLMAP executable {self.colmap_exe!r} does not exist.",
-                step="detect",
-            )
-        return self.colmap_exe
-
-    # --------------------------------------------------------------- workspace
-    def _prepare_workspace(self, image_paths: List[str]) -> str:
->>>>>>> origin/main
         """Create an isolated COLMAP project directory and stage the images."""
         if len(image_paths) < MIN_IMAGES:
             raise ColmapError(
@@ -298,10 +153,6 @@ class ReconstructionService:
                     f"Input image not found: {src}", step="validate"
                 )
 
-<<<<<<< HEAD
-=======
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
         workspace = os.path.join(self.base_workspace, f"colmap_{uuid.uuid4().hex}")
         os.makedirs(workspace, exist_ok=True)
         images_dir = os.path.join(workspace, "images")
@@ -309,11 +160,6 @@ class ReconstructionService:
         for src in image_paths:
             basename = os.path.basename(src)
             dst = os.path.join(images_dir, basename)
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-            # Use a hard link when possible to avoid extra disk usage.
->>>>>>> origin/main
             try:
                 os.link(src, dst)
             except OSError:
@@ -390,17 +236,24 @@ class ReconstructionService:
         log_lines: List[str] = []
 
         # 1. Feature extraction
-        self._run(
-            [exe, "feature_extractor", "--database_path", database, "--image_path", images_dir],
-            workspace, log_lines, "feature_extractor",
-        )
+        use_gpu = os.environ.get("COLMAP_USE_GPU", "0")
+        extractor_cmd = [
+            exe, "feature_extractor",
+            "--database_path", database,
+            "--image_path", images_dir,
+            "--FeatureExtraction.use_gpu", use_gpu,
+        ]
+        self._run(extractor_cmd, workspace, log_lines, "feature_extractor")
         self._require_path(database, "feature_extractor", min_bytes=1024)
 
-        # 2. Feature matching
-        self._run(
-            [exe, "exhaustive_matcher", "--database_path", database],
-            workspace, log_lines, "exhaustive_matcher",
-        )
+        # 2. Feature matching (sequential matcher for video frames, or exhaustive)
+        matcher = "sequential_matcher" if len(image_paths) >= 4 else "exhaustive_matcher"
+        matcher_cmd = [
+            exe, matcher,
+            "--database_path", database,
+            "--FeatureMatching.use_gpu", use_gpu,
+        ]
+        self._run(matcher_cmd, workspace, log_lines, matcher)
 
         # 3. Sparse reconstruction (incremental SfM)
         os.makedirs(sparse_dir, exist_ok=True)
@@ -471,191 +324,23 @@ class ReconstructionService:
         )
         self._require_path(sparse_ply, "model_converter")
 
-        result: Dict[str, Any] = {
-            "status": "completed",
-            "backend": "colmap",
-            "backend_path": exe,
-            "workspace": workspace,
-            "sparse_model_path": sparse_model,
-            "sparse_ply_path": sparse_ply,
-            "pointcloud_ply_path": sparse_ply,
-            "mesh_ply_path": None,
-            "num_points": int(stats["num_points"]),
-            "camera_count": int(stats["camera_count"]),
-            "registered_images": registered,
-            "reprojection_error_px": float(stats["reprojection_error_px"]),
-            "georeferenced": False,
-            "log": "\n".join(log_lines),
-        }
-
-<<<<<<< HEAD
-=======
-    def _store_results(self, db_session, job: Job, workspace: str, project_id: str) -> Reconstruction3D:
-        """Persist paths of generated files into the DB and return the model instance."""
-        pointcloud_path = os.path.join(workspace, "dense", "fused.ply")
-        mesh_path = os.path.join(workspace, "dense", "mesh.ply")
-        # Additional metadata could be collected here – for brevity we store a minimal JSON.
-        metadata = {
-            "workspace": workspace,
-            "generated": datetime.now(timezone.utc).isoformat(),
-        }
-=======
-            try:
-                os.link(src, dst)
-            except OSError:
-                shutil.copy2(src, dst)
-        return workspace
-
-    # --------------------------------------------------------------- execution
-    def _run(self, cmd: List[str], workspace: str, log_lines: List[str], step: str) -> subprocess.CompletedProcess:
-        """Validate and execute one COLMAP command, failing loudly on error."""
-        if not cmd or not all(isinstance(part, str) for part in cmd):
-            raise ColmapError("Refusing to run an empty/invalid COLMAP command.", step=step)
-        executable = cmd[0]
-        if not (os.path.isfile(executable) or shutil.which(executable)):
-            raise ColmapUnavailable(
-                f"COLMAP executable {executable!r} is not available.", step=step
-            )
-
-        log_lines.append(f"[{step}] Running: {' '.join(cmd)}")
+        # Convert sparse model to TXT for camera pose and intrinsic extraction
+        sparse_txt_dir = os.path.join(workspace, "sparse_txt")
+        os.makedirs(sparse_txt_dir, exist_ok=True)
+        sfm_data: Dict[str, Any] = {}
         try:
-            result = subprocess.run(
-                cmd, cwd=workspace, capture_output=True, text=True, check=False
+            self._run(
+                [
+                    exe, "model_converter",
+                    "--input_path", sparse_model,
+                    "--output_path", sparse_txt_dir,
+                    "--output_type", "TXT",
+                ],
+                workspace, log_lines, "model_converter_txt",
             )
-        except OSError as exc:
-            raise ColmapError(
-                f"Could not start COLMAP step '{step}': {exc}", step=step
-            ) from exc
-
-        log_lines.append(result.stdout or "")
-        if result.stderr:
-            log_lines.append(result.stderr)
-
-        if result.returncode != 0:
-            raise ColmapError(
-                f"COLMAP step '{step}' failed with exit code {result.returncode}: "
-                f"{_tail(result.stderr or result.stdout)}",
-                step=step,
-                log_tail=_tail(result.stderr or result.stdout),
-            )
-        return result
-
-    @staticmethod
-    def _require_path(path: str, step: str, *, min_bytes: int = 1) -> None:
-        if not os.path.exists(path):
-            raise ColmapError(
-                f"COLMAP step '{step}' reported success but did not produce {path!r}.",
-                step=step,
-            )
-        if os.path.isfile(path) and os.path.getsize(path) < min_bytes:
-            raise ColmapError(
-                f"COLMAP step '{step}' produced an empty artifact at {path!r}.", step=step
-            )
-
-    # -------------------------------------------------------------- full run
-    def run_reconstruction(
-        self,
-        image_paths: List[str],
-        *,
-        dense: bool = True,
-        build_mesh: bool = True,
-        dense_cfg: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """Run COLMAP synchronously and return real artifacts and real statistics.
-
-        Raises :class:`ColmapUnavailable` when COLMAP is missing and
-        :class:`ColmapError` when any step fails or its output cannot be verified.
-        """
-        exe = self._require_colmap()
-        workspace = self._prepare_workspace(image_paths)
-        images_dir = os.path.join(workspace, "images")
-        database = os.path.join(workspace, "database.db")
-        sparse_dir = os.path.join(workspace, "sparse")
-        sparse_model = os.path.join(sparse_dir, "0")
-        dense_dir = os.path.join(workspace, "dense")
-        log_lines: List[str] = []
-
-        # 1. Feature extraction
-        self._run(
-            [exe, "feature_extractor", "--database_path", database, "--image_path", images_dir],
-            workspace, log_lines, "feature_extractor",
-        )
-        self._require_path(database, "feature_extractor", min_bytes=1024)
-
-        # 2. Feature matching
-        self._run(
-            [exe, "exhaustive_matcher", "--database_path", database],
-            workspace, log_lines, "exhaustive_matcher",
-        )
-
-        # 3. Sparse reconstruction (incremental SfM)
-        os.makedirs(sparse_dir, exist_ok=True)
-        self._run(
-            [
-                exe, "mapper",
-                "--database_path", database,
-                "--image_path", images_dir,
-                "--output_path", sparse_dir,
-            ],
-            workspace, log_lines, "mapper",
-        )
-        model_files = [
-            name for name in ("cameras.bin", "images.bin", "points3D.bin")
-            if os.path.isfile(os.path.join(sparse_model, name))
-        ]
-        if len(model_files) != 3:
-            raise ColmapError(
-                "COLMAP mapper did not produce a complete sparse model "
-                f"(found {model_files or 'nothing'} in {sparse_model}). The images probably "
-                "lack sufficient overlap or texture.",
-                step="mapper",
-            )
-
-        # 4. Real statistics straight from COLMAP
-        analyzer = self._run(
-            [exe, "model_analyzer", "--path", sparse_model],
-            workspace, log_lines, "model_analyzer",
-        )
-        stats = _parse_model_analyzer(analyzer.stdout or "")
-        if stats["num_points"] is None or stats["camera_count"] is None:
-            raise ColmapError(
-                "Could not read point/camera counts from COLMAP model_analyzer output; "
-                "refusing to report reconstruction statistics.",
-                step="model_analyzer",
-                log_tail=_tail(analyzer.stdout),
-            )
-        if stats["reprojection_error_px"] is None:
-            raise ColmapError(
-                "COLMAP did not report a mean reprojection error; no accuracy value will "
-                "be invented.",
-                step="model_analyzer",
-                log_tail=_tail(analyzer.stdout),
-            )
-        if stats["num_points"] == 0:
-            raise ColmapError(
-                "COLMAP reconstructed zero 3D points; there is no point cloud to export.",
-                step="mapper",
-            )
-        registered = stats["registered_images"]
-        if registered is not None and registered < MIN_IMAGES:
-            raise ColmapError(
-                f"COLMAP registered only {registered} image(s); at least {MIN_IMAGES} are "
-                "required for a triangulated reconstruction.",
-                step="mapper",
-            )
-
-        # 5. Sparse cloud export (PLY, real COLMAP coordinates)
-        sparse_ply = os.path.join(workspace, "sparse.ply")
-        self._run(
-            [
-                exe, "model_converter",
-                "--input_path", sparse_model,
-                "--output_path", sparse_ply,
-                "--output_type", "PLY",
-            ],
-            workspace, log_lines, "model_converter",
-        )
-        self._require_path(sparse_ply, "model_converter")
+            sfm_data = self.parse_sparse_txt(sparse_txt_dir)
+        except Exception as exc:
+            log_lines.append(f"[model_converter_txt] Notice: {exc}")
 
         result: Dict[str, Any] = {
             "status": "completed",
@@ -664,6 +349,10 @@ class ReconstructionService:
             "workspace": workspace,
             "sparse_model_path": sparse_model,
             "sparse_ply_path": sparse_ply,
+            "sparse_txt_dir": sparse_txt_dir if sfm_data else None,
+            "sfm_data": sfm_data,
+            "camera_poses": sfm_data.get("images", {}),
+            "cameras": sfm_data.get("cameras", {}),
             "pointcloud_ply_path": sparse_ply,
             "mesh_ply_path": None,
             "num_points": int(stats["num_points"]),
@@ -674,7 +363,6 @@ class ReconstructionService:
             "log": "\n".join(log_lines),
         }
 
->>>>>>> origin/main
         # 6. Optional dense stage: undistort -> patch-match stereo -> fusion
         if dense:
             self._run(
@@ -732,6 +420,92 @@ class ReconstructionService:
         result["log"] = "\n".join(log_lines)
         return result
 
+    # ------------------------------------------------------------------- parser
+    @staticmethod
+    def parse_sparse_txt(txt_dir: str) -> Dict[str, Any]:
+        """Parse exported COLMAP TXT model into structured cameras, poses, and points."""
+        import numpy as np
+
+        cameras: Dict[int, Dict[str, Any]] = {}
+        cam_file = os.path.join(txt_dir, "cameras.txt")
+        if os.path.isfile(cam_file):
+            with open(cam_file, "r", encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    parts = line.split()
+                    cam_id = int(parts[0])
+                    model = parts[1]
+                    w, h = int(parts[2]), int(parts[3])
+                    if model in ("SIMPLE_PINHOLE", "SIMPLE_RADIAL"):
+                        fx = fy = float(parts[4])
+                        cx, cy = float(parts[5]), float(parts[6])
+                    else:
+                        fx = float(parts[4])
+                        fy = float(parts[5]) if len(parts) > 5 else fx
+                        cx = float(parts[6]) if len(parts) > 6 else w / 2.0
+                        cy = float(parts[7]) if len(parts) > 7 else h / 2.0
+                    cameras[cam_id] = {"w": w, "h": h, "fx": fx, "fy": fy, "cx": cx, "cy": cy, "model": model}
+
+        images: Dict[str, Dict[str, Any]] = {}
+        img_file = os.path.join(txt_dir, "images.txt")
+        if os.path.isfile(img_file):
+            with open(img_file, "r", encoding="utf-8") as fh:
+                lines = [l.strip() for l in fh if l.strip() and not l.startswith("#")]
+                for i in range(0, len(lines), 2):
+                    meta = lines[i].split()
+                    img_id = int(meta[0])
+                    qw, qx, qy, qz = [float(x) for x in meta[1:5]]
+                    tx, ty, tz = [float(x) for x in meta[5:8]]
+                    cam_id = int(meta[8])
+                    name = meta[9]
+
+                    # Quaternion to rotation matrix (World to Camera)
+                    R_w2c = np.array([
+                        [1 - 2*qy**2 - 2*qz**2, 2*qx*qy - 2*qz*qw,     2*qx*qz + 2*qy*qw],
+                        [2*qx*qy + 2*qz*qw,     1 - 2*qx**2 - 2*qz**2, 2*qy*qz - 2*qx*qw],
+                        [2*qx*qz - 2*qy*qw,     2*qy*qz + 2*qx*qw,     1 - 2*qx**2 - 2*qy**2]
+                    ], dtype=np.float64)
+                    t_w2c = np.array([tx, ty, tz], dtype=np.float64)
+
+                    # Camera to World
+                    R_c2w = R_w2c.T
+                    C_w = -R_w2c.T @ t_w2c
+
+                    pts2d: List[Any] = []
+                    if i + 1 < len(lines):
+                        pts2d_raw = lines[i+1].split()
+                        for j in range(0, len(pts2d_raw), 3):
+                            u, v, p3d = float(pts2d_raw[j]), float(pts2d_raw[j+1]), int(pts2d_raw[j+2])
+                            pts2d.append((u, v, p3d))
+
+                    images[name] = {
+                        "img_id": img_id,
+                        "q_w2c": [qw, qx, qy, qz],
+                        "t_w2c": [tx, ty, tz],
+                        "R_w2c": R_w2c.tolist(),
+                        "R_c2w": R_c2w.tolist(),
+                        "camera_center": C_w.tolist(),
+                        "cam_id": cam_id,
+                        "pts2d": pts2d,
+                    }
+
+        points3D: Dict[int, List[float]] = {}
+        pts_file = os.path.join(txt_dir, "points3D.txt")
+        if os.path.isfile(pts_file):
+            with open(pts_file, "r", encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    parts = line.split()
+                    p_id = int(parts[0])
+                    xyz = [float(parts[1]), float(parts[2]), float(parts[3])]
+                    points3D[p_id] = xyz
+
+        return {"cameras": cameras, "images": images, "points3D": points3D}
+
     # ------------------------------------------------------------------- DB
     def _store_results(self, db_session, job, workspace: str, project_id: str, result: Dict[str, Any]):
         """Persist verified COLMAP artifacts and real statistics."""
@@ -747,81 +521,23 @@ class ReconstructionService:
         # Only the real cloud bounds are stored; no placeholder metadata is written into
         # the bounds column (it is part of the public API response).
         bounds = result.get("bounds")
-<<<<<<< HEAD
-=======
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
         rec = Reconstruction3D(
             id=str(uuid.uuid4()),
             project_id=project_id,
             job_id=job.id,
-<<<<<<< HEAD
             pointcloud_ply_path=pointcloud,
             mesh_obj_path=result.get("mesh_ply_path"),
             dsm_tiff_path=None,
-=======
-<<<<<<< HEAD
-            pointcloud_ply_path=pointcloud_path,
-            mesh_obj_path=mesh_path,
-            dsm_tiff_path=None,
-            num_points=0,
-            camera_count=0,
-            reprojection_error_px=0.0,
-            bounds_json=json.dumps(metadata),
-=======
-            pointcloud_ply_path=pointcloud,
-            mesh_obj_path=result.get("mesh_ply_path"),
-            dsm_tiff_path=None,
->>>>>>> origin/main
             num_points=int(result["num_points"]),
             camera_count=int(result["camera_count"]),
             reprojection_error_px=float(result["reprojection_error_px"]),
             bounds_json=json.dumps(bounds) if bounds else None,
-<<<<<<< HEAD
-=======
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
         )
         db_session.add(rec)
         db_session.commit()
         db_session.refresh(rec)
         return rec
 
-<<<<<<< HEAD
-    # --------------------------------------------------------------- submission
-=======
-<<<<<<< HEAD
->>>>>>> origin/main
-    def submit_reconstruction(self, image_ids: List[str], project_id: str, user_id: str) -> str:
-        """Queue a Celery job that runs COLMAP on the supplied images."""
-        from ..models.job import Job
-        from ..core.database import SessionLocal
-
-        db = SessionLocal()
-        try:
-            job = Job(
-                project_id=project_id,
-                job_type="3d_reconstruction",
-                status="queued",
-                progress_pct=0,
-                owner_id=user_id,
-            )
-            db.add(job)
-            db.commit()
-            db.refresh(job)
-            job_id = job.id
-        finally:
-            db.close()
-
-        _run_reconstruction_task.delay(job_id, image_ids, project_id)
-        return job_id
-
-
-reconstruction_service = ReconstructionService()
-
-<<<<<<< HEAD
-=======
-=======
     # --------------------------------------------------------------- submission
     def submit_reconstruction(self, image_ids: List[str], project_id: str, user_id: str) -> str:
         """Queue a Celery job that runs COLMAP on the supplied images."""
@@ -850,7 +566,6 @@ reconstruction_service = ReconstructionService()
 
 reconstruction_service = ReconstructionService()
 
->>>>>>> origin/main
 
 @celery_app.task(bind=True, name="reconstruction.run")
 def _run_reconstruction_task(self, job_id: str, image_ids: List[str], project_id: str):
@@ -897,7 +612,3 @@ def _run_reconstruction_task(self, job_id: str, image_ids: List[str], project_id
         raise
     finally:
         db.close()
-<<<<<<< HEAD
-=======
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main

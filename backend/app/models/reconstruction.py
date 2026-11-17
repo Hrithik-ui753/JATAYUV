@@ -1,6 +1,5 @@
 import uuid
 from datetime import datetime, timezone
-<<<<<<< HEAD
 from sqlalchemy import (
     Column,
     String,
@@ -14,37 +13,12 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from backend.app.core.database import Base
 
-=======
-<<<<<<< HEAD
-from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey, Text
-from sqlalchemy.orm import relationship
-from backend.app.core.database import Base
-
-=======
-from sqlalchemy import (
-    Column,
-    String,
-    Integer,
-    Float,
-    DateTime,
-    ForeignKey,
-    Text,
-    Index,
-)
-from sqlalchemy.orm import relationship
-from backend.app.core.database import Base
-
->>>>>>> origin/main
 ReconstructionStatus = None  # placeholder, enum added in __table_args below
 
 
 class Reconstruction(Base):
     __tablename__ = "reconstructions"
     __table_args__ = (
-<<<<<<< HEAD
-=======
-        Index("ix_reconstructions_mission_id", "mission_id"),
->>>>>>> origin/main
         Index("ix_reconstructions_status", "status"),
         Index("ix_reconstructions_created_at", "created_at"),
     )
@@ -86,10 +60,6 @@ class Reconstruction(Base):
 # Legacy project-scoped reconstruction class kept for backwards compatibility
 # with the existing reconstruction API and any code that imports
 # ``Reconstruction3D`` from ``backend.app.models.reconstruction``.
-<<<<<<< HEAD
-=======
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
 class Reconstruction3D(Base):
     __tablename__ = "reconstructions_3d"
 
@@ -102,22 +72,7 @@ class Reconstruction3D(Base):
     num_points = Column(Integer, default=0, nullable=False)
     camera_count = Column(Integer, default=0, nullable=False)
     reprojection_error_px = Column(Float, default=0.0, nullable=False)
-<<<<<<< HEAD
     bounds_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     project = relationship("Project", back_populates="reconstructions")
-=======
-<<<<<<< HEAD
-    bounds_json = Column(Text, nullable=True)  # min/max x, y, z
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-
-    project = relationship("Project", back_populates="reconstructions")
-
-=======
-    bounds_json = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-
-    project = relationship("Project", back_populates="reconstructions")
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main

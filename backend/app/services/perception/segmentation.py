@@ -110,9 +110,10 @@ def infer_segmentation(
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_in:
             in_path = tmp_in.name
         mask_path = in_path + ".mask.png"
+        overlay_path = in_path + ".overlay.png"
         try:
             cv2.imwrite(in_path, frame_bgr)
-            metrics = service.segment_aerial_image(in_path, mask_path)
+            metrics = service.segment_aerial_image(in_path, mask_path, overlay_path)
             mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
             classes, counts = np.unique(mask, return_counts=True)
             counts_dict = {str(int(c)): int(cnt) for c, cnt in zip(classes, counts)}
@@ -129,6 +130,8 @@ def infer_segmentation(
         finally:
             if os.path.exists(in_path):
                 os.remove(in_path)
+            if os.path.exists(overlay_path):
+                os.remove(overlay_path)
     else:
         # Checkpoint is unavailable: report honest unclassified / background distribution
         counts_dict = {"0": total_pixels}

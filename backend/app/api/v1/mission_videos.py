@@ -1,33 +1,22 @@
-<<<<<<< HEAD
 import hashlib
 import os
 import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
-=======
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
->>>>>>> origin/main
 from sqlalchemy.orm import Session
 from backend.app.core.database import get_db
 from backend.app.core.config import settings
 from backend.app.models.mission import Mission
 from backend.app.models.video import Video
 from backend.app.models.user import User
-<<<<<<< HEAD
 from backend.app.models.flight_metadata import FlightMetadata
-=======
->>>>>>> origin/main
 from backend.app.schemas.video import VideoCreate, VideoUploadResponse, VideoResponse
 from backend.app.api.deps import get_current_user, check_project_owner
 
 router = APIRouter(tags=["Mission Videos"])
 
-<<<<<<< HEAD
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 
-=======
->>>>>>> origin/main
 
 def _video_to_response(video: Video) -> VideoResponse:
     return VideoResponse(
@@ -50,7 +39,6 @@ def _video_to_response(video: Video) -> VideoResponse:
 
 
 @router.post(
-<<<<<<< HEAD
     "/missions/{mission_id}/videos/upload",
     response_model=VideoResponse,
     status_code=status.HTTP_201_CREATED,
@@ -122,40 +110,87 @@ async def upload_mission_video(
     except Exception:
         pass
 
-    video = Video(
-        id=video_id,
-        mission_id=mission_id,
-        original_filename=file.filename or f"drone_video{ext}",
-        storage_path=saved_path,
-        file_size_bytes=file_size,
-        mime_type=file.content_type or f"video/{ext.lstrip('.')}",
-        duration_seconds=duration_seconds,
-        width=width,
-        height=height,
-        frame_rate=frame_rate,
-        codec=codec,
-        checksum_sha256=checksum,
-        upload_status="uploaded",
-        validation_status=validation_status,
+    target_filename = file.filename or f"drone_video{ext}"
+    video = (
+        db.query(Video)
+        .filter(Video.mission_id == mission_id, Video.original_filename == target_filename)
+        .first()
     )
-    db.add(video)
+
+    if video:
+        video.storage_path = saved_path
+        video.file_size_bytes = file_size
+        video.mime_type = file.content_type or f"video/{ext.lstrip('.')}"
+        video.duration_seconds = duration_seconds
+        video.width = width
+        video.height = height
+        video.frame_rate = frame_rate
+        video.codec = codec
+        video.checksum_sha256 = checksum
+        video.upload_status = "uploaded"
+        video.validation_status = validation_status
+    else:
+        video = Video(
+            id=video_id,
+            mission_id=mission_id,
+            original_filename=target_filename,
+            storage_path=saved_path,
+            file_size_bytes=file_size,
+            mime_type=file.content_type or f"video/{ext.lstrip('.')}",
+            duration_seconds=duration_seconds,
+            width=width,
+            height=height,
+            frame_rate=frame_rate,
+            codec=codec,
+            checksum_sha256=checksum,
+            upload_status="uploaded",
+            validation_status=validation_status,
+        )
+        db.add(video)
+
     mission.status = "uploaded"
     db.commit()
     db.refresh(video)
 
     if telemetry_file and telemetry_file.filename:
         t_ext = os.path.splitext(telemetry_file.filename)[1].lower()
-        t_path = os.path.join(upload_dir, f"{video_id}_telemetry{t_ext}")
+        t_path = os.path.join(upload_dir, f"{video.id}_telemetry{t_ext}")
         with open(t_path, "wb") as t_out:
             while t_chunk := await telemetry_file.read(512 * 1024):
                 t_out.write(t_chunk)
-        f_meta = FlightMetadata(
-            video_id=video.id,
-            source_file_path=t_path,
-            has_telemetry=True,
-            metadata_source="uploaded_file",
+
+        f_meta = (
+            db.query(FlightMetadata)
+            .filter(FlightMetadata.video_id == video.id)
+            .first()
         )
-        db.add(f_meta)
+        if not f_meta:
+            f_meta = FlightMetadata(
+                mission_id=mission_id,
+                video_id=video.id,
+                imu_data_path=t_path,
+                metadata_source="uploaded_file",
+            )
+            db.add(f_meta)
+        else:
+            f_meta.imu_data_path = t_path
+            f_meta.metadata_source = "uploaded_file"
+
+        if t_ext == ".csv":
+            try:
+                from backend.app.services.gps_association import parse_csv_telemetry
+                records = parse_csv_telemetry(t_path)
+                if records:
+                    first = records[0]
+                    last = records[-1]
+                    f_meta.latitude = first.latitude
+                    f_meta.longitude = first.longitude
+                    f_meta.altitude = first.altitude
+                    f_meta.start_timestamp = first.timestamp_str
+                    f_meta.end_timestamp = last.timestamp_str
+            except Exception:
+                pass
+
         db.commit()
 
     return _video_to_response(video)
@@ -197,8 +232,6 @@ async def upload_project_video(
 
 
 @router.post(
-=======
->>>>>>> origin/main
     "/missions/{mission_id}/videos",
     response_model=VideoUploadResponse,
     status_code=status.HTTP_201_CREATED,

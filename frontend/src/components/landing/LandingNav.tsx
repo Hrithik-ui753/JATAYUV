@@ -58,48 +58,13 @@ export function LandingNav({ onOpenDocs }: LandingNavProps) {
           </Link>
 
           {/* Desktop Nav Links */}
-          <div className="hidden lg:flex items-center gap-1 text-xs font-mono">
-            {/* Product capabilities link */}
+          <div className="hidden md:flex items-center gap-1 text-xs font-mono">
             <a
               href="#capabilities"
               className="px-3 py-2 rounded text-muted-foreground hover:text-white hover:bg-forest-800/50 transition-colors"
             >
               CAPABILITIES
             </a>
-
-            {/* Solutions Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setSolutionsOpen(!solutionsOpen)}
-                onMouseEnter={() => setSolutionsOpen(true)}
-                className="flex items-center gap-1 px-3 py-2 rounded text-muted-foreground hover:text-white hover:bg-forest-800/50 transition-colors"
-              >
-                SOLUTIONS <ChevronDown className="w-3 h-3 text-emerald-400" />
-              </button>
-
-              {solutionsOpen && (
-                <div
-                  onMouseLeave={() => setSolutionsOpen(false)}
-                  className="absolute left-0 top-full mt-1 w-80 p-2 rounded-lg glass-panel border-emerald-500/30 shadow-2xl z-50 flex flex-col gap-1"
-                >
-                  {solutions.map((item) => (
-                    <a
-                      key={item.title}
-                      href={item.href}
-                      onClick={() => setSolutionsOpen(false)}
-                      className="p-2.5 rounded hover:bg-forest-800/80 transition-colors text-left group"
-                    >
-                      <div className="text-xs font-medium text-white group-hover:text-emerald-300">
-                        {item.title}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
-                        {item.desc}
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
 
             <a
               href="#workflow"
@@ -135,16 +100,6 @@ export function LandingNav({ onOpenDocs }: LandingNavProps) {
 
         {/* Right CTA Actions */}
         <div className="hidden sm:flex items-center gap-3">
-          {/* Status Indicator */}
-          <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded bg-forest-900 border border-emerald-500/20 font-mono text-[11px]">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
-            </span>
-            <span className="text-muted-foreground">CLUSTER:</span>
-            <span className="text-emerald-300 font-semibold">ONLINE (0.02s)</span>
-          </div>
-
           <Link href="/login">
             <Button variant="outline" size="sm">
               Sign In
@@ -153,7 +108,7 @@ export function LandingNav({ onOpenDocs }: LandingNavProps) {
 
           <Link href="/dashboard">
             <Button variant="primary" size="sm">
-              Launch Mission Control <ArrowRight className="w-3.5 h-3.5 ml-1" />
+              Launch Dashboard <ArrowRight className="w-3.5 h-3.5 ml-1" />
             </Button>
           </Link>
         </div>

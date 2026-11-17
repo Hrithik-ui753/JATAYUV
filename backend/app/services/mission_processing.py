@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import os
 import secrets
+import socket
+import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -33,6 +35,20 @@ from backend.app.services.gps_association import (
 )
 from backend.app.services.storage import get_mission_storage
 from backend.app.services.video_probe import VideoLimits, build_video_report, decode_video_metadata
+def _is_redis_active() -> bool:
+    """Fast check whether Redis is actively reachable on localhost or configured host."""
+    try:
+        from urllib.parse import urlparse
+        from backend.app.core.config import settings
+        parsed = urlparse(settings.CELERY_BROKER_URL)
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port or 6379
+        with socket.create_connection((host, port), timeout=0.5):
+            return True
+    except Exception:
+        return False
+
+
 def _delay_pipeline(**kwargs: Any) -> Any:
     from backend.app.workers.video_tasks import run_full_processing_pipeline
     return run_full_processing_pipeline.delay(**kwargs)
@@ -95,7 +111,12 @@ def enqueue_full_processing(
     user_id: str,
     video_processing_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Validate and enqueue the full processing pipeline for a video."""
+    """Validate and enqueue the full processing pipeline for a video.
+    
+    If Redis / Celery broker is available, dispatches to Celery.
+    If running standalone or broker is unreachable, executes asynchronously in a
+    background thread so the HTTP request completes immediately with 202 Accepted.
+    """
     db = SessionLocal()
     try:
         job = create_video_processing_job(
@@ -107,40 +128,52 @@ def enqueue_full_processing(
         )
         video = db.query(Video).filter(Video.id == video_id).first()
         task_kwargs = _build_pipeline_kwargs(job, video, video_processing_config)
-<<<<<<< HEAD
-        try:
-            async_result = _delay_pipeline(**task_kwargs)
-        except Exception as exc:  # broker unreachable or misconfigured
-            job.status = "failed"
-            job.error_message = (
-                "Failed to enqueue processing task (is the Celery broker "
-                f"reachable?): {exc}"
-            )
-            db.commit()
-            raise RuntimeError(job.error_message) from exc
 
-        job.celery_task_id = getattr(async_result, "id", None)
-        db.refresh(job)
-        # In eager/dev mode the task runs inline and may already be terminal;
-        # never move a terminal job back to queued.
-        if job.status not in ("completed", "failed", "cancelled"):
-            job.status = "queued"
+        # Dispatch via Celery only if Redis is genuinely reachable
+        if _is_redis_active():
+            try:
+                async_result = _delay_pipeline(**task_kwargs)
+                job.celery_task_id = getattr(async_result, "id", None)
+                if job.status not in ("completed", "failed", "cancelled"):
+                    job.status = "queued"
+                db.commit()
+                db.refresh(job)
+                return {
+                    "job_id": job.id,
+                    "celery_task_id": job.celery_task_id,
+                    "processing_run_id": job.processing_run_id,
+                    "status": job.status,
+                }
+            except Exception:
+                pass  # Fallback to direct thread
+
+        # Standalone / direct background thread execution
+        from backend.app.workers.video_tasks import run_pipeline_direct
+        t = threading.Thread(
+            target=run_pipeline_direct,
+            kwargs=task_kwargs,
+            daemon=True,
+            name=f"video-worker-{job.id}",
+        )
+        t.start()
+
+        job.celery_task_id = f"thread-{job.id}"
+        job.status = "processing"
+        job.stage = "upload_validation"
+        job.progress_pct = 10
         db.commit()
         db.refresh(job)
-=======
-        _delay_pipeline.delay(**task_kwargs)
->>>>>>> origin/main
+
         return {
             "job_id": job.id,
             "celery_task_id": job.celery_task_id,
             "processing_run_id": job.processing_run_id,
-            "status": job.status,
+            "status": "processing",
         }
     finally:
         db.close()
 
 
-<<<<<<< HEAD
 def cancel_video_processing(
     video_id: str,
     *,
@@ -190,8 +223,6 @@ def cancel_video_processing(
     return {"status": "cancelled", "job_id": job.id, "video_id": video_id}
 
 
-=======
->>>>>>> origin/main
 def _build_pipeline_kwargs(
     job: Job,
     video: Video,
@@ -270,11 +301,7 @@ def get_processing_report_for_mission(
         Job.job_type == "video_processing",
     )
     if processing_run_id:
-<<<<<<< HEAD
         query = query.filter(Job.processing_run_id == processing_run_id)
-=======
-        query = query.filter(getattr(Job, "processing_run_id", None) == processing_run_id)
->>>>>>> origin/main
     jobs = query.order_by(Job.created_at.desc()).all()
     if not jobs:
         return {"error": "no_processing_found"}

@@ -91,11 +91,8 @@ def get_mission_storage() -> MissionStorage:
     if _mission_storage is None:
         _mission_storage = MissionStorage()
     return _mission_storage
-<<<<<<< HEAD
 
 
 # Backward-compatibility alias
 StorageService = MissionStorage
 
-=======
->>>>>>> origin/main

@@ -1,34 +1,26 @@
-"""Baseline schema for tables that predate the mission data spine.
 
-Revision 001 builds the mission/video tables but assumes the core platform
-tables (users, projects, images, jobs, inference results, ...) already exist,
-because older installations created them with ``Base.metadata.create_all``.
-That made ``alembic upgrade head`` fail on a genuinely empty database.
+"""Baseline schema for core platform tables.
 
-This baseline revision materialises the core tables from the SQLAlchemy model
-metadata so the migration chain is self-contained. It is a migration-time
-operation only; the application no longer relies on ``create_all`` for schema
-provisioning.
-
-Revision ID: 000_base_schema
-Revises: None
+Creates the core SQLAlchemy tables before mission-related migrations.
+Existing tables are preserved.
 """
+
 from __future__ import annotations
 
 from typing import Union
 
 from alembic import op
 
-import backend.app.models  # noqa: F401  (registers every model table)
+import backend.app.models  # noqa: F401 - register model metadata
 from backend.app.core.database import Base
+
 
 revision: str = "000_base_schema"
 down_revision: Union[str, None] = None
-branch_labels: Union[str, list[str], None] = None
-depends_on: Union[str, list[str], None] = None
+branch_labels = None
+depends_on = None
 
 
-# Core platform tables that existed before the mission data spine (revision 001).
 CORE_TABLES = (
     "users",
     "projects",
@@ -48,11 +40,24 @@ CORE_TABLES = (
 
 def upgrade() -> None:
     bind = op.get_bind()
+
     for name in CORE_TABLES:
-        Base.metadata.tables[name].create(bind, checkfirst=True)
+        table = Base.metadata.tables.get(name)
+
+        if table is None:
+            raise RuntimeError(
+                f"Required SQLAlchemy model table '{name}' "
+                "was not registered in Base.metadata."
+            )
+
+        table.create(bind=bind, checkfirst=True)
 
 
 def downgrade() -> None:
     bind = op.get_bind()
+
     for name in reversed(CORE_TABLES):
-        Base.metadata.tables[name].drop(bind, checkfirst=True)
+        table = Base.metadata.tables.get(name)
+
+        if table is not None:
+            table.drop(bind=bind, checkfirst=True)

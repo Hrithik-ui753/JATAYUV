@@ -33,15 +33,16 @@ import {
   Video,
   Film,
   Play,
-  Compass
+  Compass,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { BeforeAfterSlider } from "@/components/viewer/BeforeAfterSlider";
 import { DepthViewer } from "@/components/viewer/DepthViewer";
+import { SegmentationOverlay } from "@/components/viewer/SegmentationOverlay";
 import { api } from "@/lib/api";
-<<<<<<< HEAD
 import { uploadOutcome } from "@/lib/integrity.mjs";
 import {
   Project,
@@ -52,21 +53,6 @@ import {
   DamageAssessmentResult,
   ChangeDetectionResult,
   Reconstruction3DResult
-=======
-<<<<<<< HEAD
-=======
-import { uploadOutcome } from "@/lib/integrity.mjs";
->>>>>>> 0400f2f (p5-udpated)
-import { 
-  Project, 
-  AerialImage, 
-  AnalysisJob, 
-  DepthResult, 
-  SegmentationResult, 
-  DamageAssessmentResult, 
-  ChangeDetectionResult, 
-  Reconstruction3DResult 
->>>>>>> origin/main
 } from "@/types";
 
 // Dynamic import for 3D visualizer
@@ -89,6 +75,21 @@ const AdvancedSpatialViewer3D = dynamic(
   }
 );
 
+function toMediaUrl(path?: string | null): string {
+  if (!path) return "";
+  let clean = path.replace(/\\/g, "/");
+  if (clean.startsWith("http://") || clean.startsWith("https://")) {
+    return clean;
+  }
+  const storageIndex = clean.indexOf("storage/");
+  if (storageIndex !== -1) {
+    clean = "/" + clean.slice(storageIndex);
+  } else if (!clean.startsWith("/")) {
+    clean = "/" + clean;
+  }
+  return clean;
+}
+
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<
     "overview" | "projects" | "upload" | "ai" | "viewer3d" | "jobs" | "models" | "settings"
@@ -98,7 +99,10 @@ export default function DashboardPage() {
 
   // Core Data States
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("proj-coastal-01");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [selectedImageId, setSelectedImageId] = useState<string>("");
+  const [selectedPostImageId, setSelectedPostImageId] = useState<string>("");
+  const [uploadMode, setUploadMode] = useState<"video" | "images">("video");
   const [images, setImages] = useState<AerialImage[]>([]);
   const [jobs, setJobs] = useState<AnalysisJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,14 +115,14 @@ export default function DashboardPage() {
   const [changeResult, setChangeResult] = useState<ChangeDetectionResult | null>(null);
   const [reconResult, setReconResult] = useState<Reconstruction3DResult | null>(null);
   const [activeInferencing, setActiveInferencing] = useState<string | null>(null);
-<<<<<<< HEAD
 
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [damageViewMode, setDamageViewMode] = useState<"overlay" | "slider">("overlay");
+  const [changeViewMode, setChangeViewMode] = useState<"heatmap" | "mask" | "slider">("heatmap");
 
   // Upload state — a success message is only shown after the backend confirms stored frames.
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
-<<<<<<< HEAD
   const [uploadStatus, setUploadStatus] = useState<
     { kind: "success" | "error"; message: string } | null
   >(null);
@@ -131,19 +135,6 @@ export default function DashboardPage() {
   const [selectedVideo, setSelectedVideo] = useState<any | null>(null);
   const [processingVideo, setProcessingVideo] = useState(false);
   const [videoProcessStatus, setVideoProcessStatus] = useState<string | null>(null);
-=======
-  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
-=======
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-
-  // Upload state — a success message is only shown after the backend confirms stored frames.
-  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState<
-    { kind: "success" | "error"; message: string } | null
-  >(null);
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
 
   // Create Project Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -168,45 +159,88 @@ export default function DashboardPage() {
   const fetchData = async () => {
     try {
       setRefreshing(true);
-      const projList = await api.getProjects();
+      const projList = await api.getProjects().catch(() => []);
       setProjects(projList);
 
-      const activeId = selectedProjectId || (projList[0]?.id ?? "proj-coastal-01");
+      let activeId = selectedProjectId;
+      if (!activeId || !projList.some((p) => p.id === activeId)) {
+        activeId = projList[0]?.id || "";
+      }
       setSelectedProjectId(activeId);
 
+      if (!activeId) {
+        setImages([]);
+        setJobs([]);
+        setProjectVideos([]);
+        return;
+      }
+
       const [imgList, jobList] = await Promise.all([
-        api.getProjectImages(activeId),
-        api.getProjectJobs(activeId),
+        api.getProjectImages(activeId).catch(() => []),
+        api.getProjectJobs(activeId).catch(() => []),
       ]);
       setImages(imgList);
       setJobs(jobList);
 
-      // Load sample analysis results
-      try {
-        const dRes = await api.getDepthResult("img-pre-01");
-        setDepthResult(dRes);
-      } catch {}
-      try {
-        const sRes = await api.getSegmentationResult("img-pre-01");
-        setSegmentationResult(sRes);
-      } catch {}
-      try {
-        const dmgRes = await api.getDamageResult("img-pre-01", "img-post-01");
-        setDamageResult(dmgRes);
-      } catch {}
-      try {
-        const cRes = await api.getChangeResult("img-pre-01", "img-post-01");
-        setChangeResult(cRes);
-      } catch {}
+      const img1 = imgList[0]?.id || "";
+      const img2 = imgList[1]?.id || imgList[0]?.id || "";
+      if (img1 && (!selectedImageId || !imgList.some((img) => img.id === selectedImageId))) {
+        setSelectedImageId(img1);
+      }
+      if (img2 && (!selectedPostImageId || !imgList.some((img) => img.id === selectedPostImageId))) {
+        setSelectedPostImageId(img2);
+      }
+
+      if (img1) {
+        try {
+          const dRes = await api.getDepthResult(img1);
+          setDepthResult(dRes);
+        } catch {
+          setDepthResult(null);
+        }
+        try {
+          const sRes = await api.getSegmentationResult(img1);
+          setSegmentationResult(sRes);
+        } catch {
+          setSegmentationResult(null);
+        }
+      } else {
+        setDepthResult(null);
+        setSegmentationResult(null);
+      }
+
+      if (img1 && img2) {
+        try {
+          const dmgRes = await api.getDamageResult(img1, img2);
+          setDamageResult(dmgRes);
+        } catch {
+          setDamageResult(null);
+        }
+        try {
+          const cRes = await api.getChangeResult(img1, img2);
+          setChangeResult(cRes);
+        } catch {
+          setChangeResult(null);
+        }
+      } else {
+        setDamageResult(null);
+        setChangeResult(null);
+      }
+
       try {
         const rRes = await api.get3DReconstructionResult(activeId);
         setReconResult(rRes);
-      } catch {}
+      } catch {
+        setReconResult(null);
+      }
+
       try {
         const vids = await api.getProjectVideos(activeId);
         setProjectVideos(vids);
         if (vids.length > 0) setSelectedVideo(vids[0]);
-      } catch {}
+      } catch {
+        setProjectVideos([]);
+      }
     } catch (err) {
       console.error("Dashboard fetch error:", err);
     } finally {
@@ -243,7 +277,7 @@ export default function DashboardPage() {
   const handleStartProcessingVideo = async (video: any) => {
     if (!video || !video.mission_id) return;
     setProcessingVideo(true);
-    setVideoProcessStatus("Dispatching single-pass video reconstruction pipeline (PyAV -> Blur Filter -> Perception -> COLMAP)...");
+    setVideoProcessStatus("Dispatching single-pass video pipeline (PyAV -> Sharpness Gate -> Perception -> 3D Surface)...");
     try {
       await api.enqueueVideoProcessing(video.mission_id, video.id);
       setVideoProcessStatus("Pipeline active: extracting keyframes, computing depth & building 3D model.");
@@ -260,6 +294,19 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchData();
   }, [selectedProjectId]);
+
+  // Automatically refresh AI analysis when the user selects a different image frame
+  useEffect(() => {
+    if (!selectedImageId) return;
+    api.getDepthResult(selectedImageId).then(setDepthResult).catch(() => setDepthResult(null));
+    api.getSegmentationResult(selectedImageId).then(setSegmentationResult).catch(() => setSegmentationResult(null));
+  }, [selectedImageId]);
+
+  useEffect(() => {
+    if (!selectedImageId || !selectedPostImageId) return;
+    api.getDamageResult(selectedImageId, selectedPostImageId).then(setDamageResult).catch(() => setDamageResult(null));
+    api.getChangeResult(selectedImageId, selectedPostImageId).then(setChangeResult).catch(() => setChangeResult(null));
+  }, [selectedImageId, selectedPostImageId]);
 
   // Project Change
   const handleSelectProject = (id: string) => {
@@ -302,36 +349,11 @@ export default function DashboardPage() {
     }
   };
 
-<<<<<<< HEAD
   // Image Upload Handler — success is only reported when the backend confirms records.
-=======
-<<<<<<< HEAD
-  // Image Upload Handler
-=======
-  // Image Upload Handler — success is only reported when the backend confirms records.
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (uploadFiles.length === 0) return;
     setUploading(true);
-<<<<<<< HEAD
-    setUploadStatus(null);
-=======
-<<<<<<< HEAD
-    setUploadStatus("Ingesting UAV imagery and parsing EXIF headers...");
->>>>>>> origin/main
-    try {
-      const uploaded = await api.uploadImages(selectedProjectId, uploadFiles);
-      setImages([...uploaded, ...images]);
-      setUploadStatus(uploadOutcome({ ok: true, uploadedCount: uploaded.length }));
-      // Keep the selection only when the backend stored nothing (retry path).
-      if (uploaded.length > 0) setUploadFiles([]);
-    } catch (err: any) {
-<<<<<<< HEAD
-=======
-      setUploadStatus("Upload completed with local simulation.");
-=======
     setUploadStatus(null);
     try {
       const uploaded = await api.uploadImages(selectedProjectId, uploadFiles);
@@ -340,7 +362,6 @@ export default function DashboardPage() {
       // Keep the selection only when the backend stored nothing (retry path).
       if (uploaded.length > 0) setUploadFiles([]);
     } catch (err: any) {
->>>>>>> origin/main
       // The selection stays in place so the operator can retry the same upload.
       setUploadStatus(
         uploadOutcome({
@@ -348,124 +369,89 @@ export default function DashboardPage() {
           errorMessage: err?.message ?? "No response from the backend",
         })
       );
-<<<<<<< HEAD
-=======
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
     } finally {
       setUploading(false);
     }
   };
 
   // Trigger AI Depth
-  const triggerDepth = async (imageId: string) => {
+  const triggerDepth = async (imageId?: string) => {
+    const targetId = imageId || selectedImageId || images[0]?.id;
+    if (!targetId) {
+      setAnalysisError("No aerial image available in this mission to estimate depth.");
+      return;
+    }
     setActiveInferencing("depth");
-<<<<<<< HEAD
     setAnalysisError(null);
-=======
-<<<<<<< HEAD
-=======
-    setAnalysisError(null);
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
     try {
-      const res = await api.triggerDepthEstimation(imageId);
+      const res = await api.triggerDepthEstimation(targetId);
       setDepthResult(res);
       fetchData();
-<<<<<<< HEAD
     } catch (err: any) {
       setAnalysisError(err?.message ?? "Depth estimation failed");
-=======
-<<<<<<< HEAD
-    } catch (err) {
-      console.error(err);
-=======
-    } catch (err: any) {
-      setAnalysisError(err?.message ?? "Depth estimation failed");
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
     } finally {
       setActiveInferencing(null);
     }
   };
 
   // Trigger AI Segmentation
-  const triggerSegmentation = async (imageId: string) => {
+  const triggerSegmentation = async (imageId?: string) => {
+    const targetId = imageId || selectedImageId || images[0]?.id;
+    if (!targetId) {
+      setAnalysisError("No aerial image available in this mission to segment.");
+      return;
+    }
     setActiveInferencing("segmentation");
-<<<<<<< HEAD
     setAnalysisError(null);
-=======
-<<<<<<< HEAD
-=======
-    setAnalysisError(null);
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
     try {
-      const res = await api.triggerSegmentation(imageId);
+      const res = await api.triggerSegmentation(targetId);
       setSegmentationResult(res);
       fetchData();
-<<<<<<< HEAD
     } catch (err: any) {
       setSegmentationResult(null);
       setAnalysisError(err?.message ?? "Segmentation failed");
-=======
-<<<<<<< HEAD
-    } catch (err) {
-      console.error(err);
-=======
-    } catch (err: any) {
-      setSegmentationResult(null);
-      setAnalysisError(err?.message ?? "Segmentation failed");
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
     } finally {
       setActiveInferencing(null);
     }
   };
 
   // Trigger Damage Assessment
-  const triggerDamage = async (preId: string, postId: string) => {
+  const triggerDamage = async (preId?: string, postId?: string) => {
+    const pre = preId || selectedImageId || images[0]?.id;
+    const post = postId || selectedPostImageId || images[1]?.id || images[0]?.id;
+    if (!pre || !post) {
+      setAnalysisError("Two aerial images (pre and post disaster) are required for damage evaluation.");
+      return;
+    }
     setActiveInferencing("damage");
-<<<<<<< HEAD
     setAnalysisError(null);
-=======
-<<<<<<< HEAD
-=======
-    setAnalysisError(null);
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
     try {
-      const res = await api.triggerDamageAssessment(preId, postId);
+      const res = await api.triggerDamageAssessment(pre, post);
       setDamageResult(res);
       fetchData();
-<<<<<<< HEAD
     } catch (err: any) {
       setDamageResult(null);
       setAnalysisError(err?.message ?? "Damage assessment failed");
-=======
-<<<<<<< HEAD
-    } catch (err) {
-      console.error(err);
-=======
-    } catch (err: any) {
-      setDamageResult(null);
-      setAnalysisError(err?.message ?? "Damage assessment failed");
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
     } finally {
       setActiveInferencing(null);
     }
   };
 
   // Trigger Change Detection
-  const triggerChange = async (beforeId: string, afterId: string) => {
+  const triggerChange = async (beforeId?: string, afterId?: string) => {
+    const before = beforeId || selectedImageId || images[0]?.id;
+    const after = afterId || selectedPostImageId || images[1]?.id || images[0]?.id;
+    if (!before || !after) {
+      setAnalysisError("Two aerial images are required for change detection.");
+      return;
+    }
     setActiveInferencing("change");
     try {
-      const res = await api.triggerChangeDetection(beforeId, afterId);
+      const res = await api.triggerChangeDetection(before, after);
       setChangeResult(res);
       fetchData();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setAnalysisError(err?.message ?? "Change detection failed");
     } finally {
       setActiveInferencing(null);
     }
@@ -473,40 +459,28 @@ export default function DashboardPage() {
 
   // Trigger 3D Reconstruction
   const trigger3D = async () => {
+    if (!selectedProjectId) {
+      setAnalysisError("Please select a mission first.");
+      return;
+    }
     setActiveInferencing("3d");
-<<<<<<< HEAD
     setAnalysisError(null);
-=======
-<<<<<<< HEAD
-=======
-    setAnalysisError(null);
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
     try {
       const res = await api.trigger3DReconstruction(selectedProjectId);
       setReconResult(res);
       fetchData();
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-    } catch (err) {
-      console.error(err);
-=======
->>>>>>> origin/main
     } catch (err: any) {
       // Reconstruction unavailability/failure is surfaced; no geometry is displayed.
       setReconResult(null);
       setAnalysisError(err?.message ?? "3D reconstruction failed");
-<<<<<<< HEAD
-=======
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
     } finally {
       setActiveInferencing(null);
     }
   };
 
   const currentProject = projects.find((p) => p.id === selectedProjectId) || projects[0];
+  const activeImage = images.find((i) => i.id === selectedImageId) || images[0];
+  const activePostImage = images.find((i) => i.id === selectedPostImageId) || images[1] || images[0];
 
   return (
     <div className="flex-1 flex flex-col bg-forest-950 text-foreground min-h-[calc(100vh-3.5rem)] selection:bg-emerald-500 selection:text-black">
@@ -605,15 +579,7 @@ export default function DashboardPage() {
                       {projects.length}
                     </h3>
                     <p className="text-[10px] font-mono text-emerald-400 mt-0.5">
-<<<<<<< HEAD
                       Stored missions
-=======
-<<<<<<< HEAD
-                      100% Calibrated
-=======
-                      Stored missions
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
                     </p>
                   </div>
                   <div className="h-10 w-10 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
@@ -629,24 +595,10 @@ export default function DashboardPage() {
                       INGESTED DRONE FRAMES
                     </p>
                     <h3 className="text-2xl font-black text-white mt-1">
-<<<<<<< HEAD
                       {images.length}
                     </h3>
                     <p className="text-[10px] font-mono text-emerald-400 mt-0.5">
                       Backend-confirmed uploads
-=======
-<<<<<<< HEAD
-                      {images.length > 0 ? images.length * 42 : 148}
-                    </h3>
-                    <p className="text-[10px] font-mono text-emerald-400 mt-0.5">
-                      EXIF Geotagged
-=======
-                      {images.length}
-                    </h3>
-                    <p className="text-[10px] font-mono text-emerald-400 mt-0.5">
-                      Backend-confirmed uploads
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
                     </p>
                   </div>
                   <div className="h-10 w-10 rounded bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center">
@@ -662,24 +614,10 @@ export default function DashboardPage() {
                       STRUCTURES ASSESSED (xBD)
                     </p>
                     <h3 className="text-2xl font-black text-rose-400 mt-1">
-<<<<<<< HEAD
                       {damageResult ? damageResult.total_buildings : "—"}
                     </h3>
                     <p className="text-[10px] font-mono text-rose-300 mt-0.5">
                       {damageResult ? "4-Tier Classification" : "No verified assessment"}
-=======
-<<<<<<< HEAD
-                      {damageResult ? damageResult.total_buildings : 248}
-                    </h3>
-                    <p className="text-[10px] font-mono text-rose-300 mt-0.5">
-                      4-Tier Classification
-=======
-                      {damageResult ? damageResult.total_buildings : "—"}
-                    </h3>
-                    <p className="text-[10px] font-mono text-rose-300 mt-0.5">
-                      {damageResult ? "4-Tier Classification" : "No verified assessment"}
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
                     </p>
                   </div>
                   <div className="h-10 w-10 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center">
@@ -695,24 +633,10 @@ export default function DashboardPage() {
                       3D POINT CLOUD ASSETS
                     </p>
                     <h3 className="text-2xl font-black text-cyan-400 mt-1">
-<<<<<<< HEAD
                       {reconResult ? `${(reconResult.num_points / 1000).toFixed(0)}K pts` : "—"}
                     </h3>
                     <p className="text-[10px] font-mono text-cyan-300 mt-0.5">
-                      {reconResult ? "Verified COLMAP cloud" : "No verified reconstruction"}
-=======
-<<<<<<< HEAD
-                      {reconResult ? `${(reconResult.num_points / 1000).toFixed(0)}K pts` : "124K pts"}
-                    </h3>
-                    <p className="text-[10px] font-mono text-cyan-300 mt-0.5">
-                      Dense Multi-View SfM
-=======
-                      {reconResult ? `${(reconResult.num_points / 1000).toFixed(0)}K pts` : "—"}
-                    </h3>
-                    <p className="text-[10px] font-mono text-cyan-300 mt-0.5">
-                      {reconResult ? "Verified COLMAP cloud" : "No verified reconstruction"}
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
+                      {reconResult ? `${(reconResult.num_points / 1000).toFixed(0)}K pts · Verified 3D Surface` : "No verified reconstruction"}
                     </p>
                   </div>
                   <div className="h-10 w-10 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center">
@@ -731,7 +655,7 @@ export default function DashboardPage() {
                     PRIMARY 3D SPATIAL SURFACE // {currentProject?.name}
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Multi-view SfM dense point cloud and elevation relief mesh.
+                    Multi-view dense photogrammetric point cloud and digital elevation surface.
                   </CardDescription>
                 </div>
                 <Button
@@ -746,15 +670,7 @@ export default function DashboardPage() {
                 <AdvancedSpatialViewer3D
                   projectName={currentProject?.name}
                   locationName={currentProject?.location_name}
-<<<<<<< HEAD
-                  plyUrl={reconResult?.pointcloud_ply_path}
-=======
-<<<<<<< HEAD
-                  initialPointCount={65000}
-=======
-                  plyUrl={reconResult?.pointcloud_ply_path}
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
+                  plyUrl={toMediaUrl(reconResult?.pointcloud_ply_path)}
                 />
               </CardContent>
             </Card>
@@ -907,108 +823,213 @@ export default function DashboardPage() {
         )}
 
         {/* ============================================================== */}
-        {/* TAB 3: DRONE VIDEO INGESTION & 3D PIPELINE */}
+        {/* TAB 3: DRONE VIDEO & FRAME INGESTION PIPELINE */}
         {/* ============================================================== */}
         {activeTab === "upload" && (
           <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-white font-mono flex items-center gap-2">
                   <Video className="w-5 h-5 text-emerald-400" />
-                  Single-Pass Drone Video Ingestion &amp; 3D Reconstruction
+                  Aerial Ingestion &amp; 3D Reconstruction Pipeline
                 </h2>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Upload raw UAV video footage (.mp4, .mov, .m4v, .avi) with flight telemetry (.csv, .srt, .gpx) for {currentProject?.name}.
+                  Ingest UAV video footage or batch aerial still frames for <span className="text-emerald-300 font-bold">{currentProject?.name}</span>.
                 </p>
+              </div>
+
+              {/* Mode Toggle */}
+              <div className="flex items-center gap-1.5 p-1 rounded-lg bg-forest-900 border border-emerald-500/25 font-mono text-xs">
+                <button
+                  type="button"
+                  onClick={() => setUploadMode("video")}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+                    uploadMode === "video"
+                      ? "bg-emerald-600 text-white shadow-md shadow-emerald-950/60"
+                      : "text-muted-foreground hover:text-white"
+                  }`}
+                >
+                  <Video className="w-3.5 h-3.5" /> Drone Video (.mp4 / .mov)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUploadMode("images")}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+                    uploadMode === "images"
+                      ? "bg-emerald-600 text-white shadow-md shadow-emerald-950/60"
+                      : "text-muted-foreground hover:text-white"
+                  }`}
+                >
+                  <UploadCloud className="w-3.5 h-3.5" /> Aerial Frames (.jpg / .tif)
+                </button>
               </div>
             </div>
 
-            {/* Primary Drone Video Upload Form */}
-            <form onSubmit={handleVideoUploadSubmit} className="glass-panel p-6 rounded-xl border border-emerald-500/25 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Video File Dropzone */}
-                <div className="border-2 border-dashed border-emerald-500/30 rounded-lg p-6 flex flex-col items-center justify-center text-center hover:border-emerald-500/60 transition-colors bg-forest-950/40 relative">
-                  <Film className="w-10 h-10 text-emerald-400 mb-2" />
-                  <p className="text-sm font-bold text-white font-mono">
-                    Select Single-Pass Drone Video
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    MP4, MOV, M4V, AVI (H.264, HEVC / 4K / 1080p)
-                  </p>
-                  <input
-                    type="file"
-                    accept="video/*,.mp4,.mov,.m4v,.avi,.mkv,.webm"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setVideoFile(e.target.files[0]);
-                      }
-                    }}
-                    className="mt-3 text-xs font-mono text-emerald-400 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-mono file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 cursor-pointer"
-                  />
-                  {videoFile && (
-                    <div className="mt-2 text-xs font-mono text-emerald-300">
-                      Selected: {videoFile.name} ({(videoFile.size / 1024 / 1024).toFixed(1)} MB)
-                    </div>
-                  )}
+            {/* Mode 1: Drone Video Upload Form */}
+            {uploadMode === "video" && (
+              <form onSubmit={handleVideoUploadSubmit} className="glass-panel p-6 rounded-xl border border-emerald-500/25 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Video File Dropzone */}
+                  <div className="border-2 border-dashed border-emerald-500/30 rounded-lg p-6 flex flex-col items-center justify-center text-center hover:border-emerald-500/60 transition-colors bg-forest-950/40 relative">
+                    <Film className="w-10 h-10 text-emerald-400 mb-2" />
+                    <p className="text-sm font-bold text-white font-mono">
+                      Select Single-Pass Drone Video
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      MP4, MOV, M4V, AVI, MKV (H.264, HEVC / 4K / 1080p)
+                    </p>
+                    <input
+                      type="file"
+                      accept="video/*,.mp4,.mov,.m4v,.avi,.mkv,.webm"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setVideoFile(e.target.files[0]);
+                        }
+                      }}
+                      className="mt-3 text-xs font-mono text-emerald-400 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-mono file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 cursor-pointer"
+                    />
+                    {videoFile && (
+                      <div className="mt-2 text-xs font-mono text-emerald-300 font-semibold">
+                        Selected: {videoFile.name} ({(videoFile.size / 1024 / 1024).toFixed(1)} MB)
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Optional Telemetry File Dropzone */}
+                  <div className="border-2 border-dashed border-emerald-500/20 rounded-lg p-6 flex flex-col items-center justify-center text-center hover:border-emerald-500/40 transition-colors bg-forest-950/30 relative">
+                    <Compass className="w-10 h-10 text-cyan-400 mb-2" />
+                    <p className="text-sm font-bold text-white font-mono">
+                      Flight Telemetry Log (Optional)
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      CSV, SRT, GPX, or embedded drone GPS flight log
+                    </p>
+                    <input
+                      type="file"
+                      accept=".csv,.srt,.gpx,.txt,.json"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setTelemetryFile(e.target.files[0]);
+                        }
+                      }}
+                      className="mt-3 text-xs font-mono text-cyan-400 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-mono file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer"
+                    />
+                    {telemetryFile && (
+                      <div className="mt-2 text-xs font-mono text-cyan-300 font-semibold">
+                        Selected: {telemetryFile.name} ({(telemetryFile.size / 1024).toFixed(1)} KB)
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Optional Telemetry File Dropzone */}
-                <div className="border-2 border-dashed border-emerald-500/20 rounded-lg p-6 flex flex-col items-center justify-center text-center hover:border-emerald-500/40 transition-colors bg-forest-950/30 relative">
-                  <Compass className="w-10 h-10 text-cyan-400 mb-2" />
-                  <p className="text-sm font-bold text-white font-mono">
-                    Flight Telemetry Log (Optional)
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    CSV, SRT, GPX, or embedded drone GPS flight log
-                  </p>
-                  <input
-                    type="file"
-                    accept=".csv,.srt,.gpx,.txt,.json"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setTelemetryFile(e.target.files[0]);
-                      }
-                    }}
-                    className="mt-3 text-xs font-mono text-cyan-400 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-mono file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer"
-                  />
-                  {telemetryFile && (
-                    <div className="mt-2 text-xs font-mono text-cyan-300">
-                      Selected: {telemetryFile.name} ({(telemetryFile.size / 1024).toFixed(1)} KB)
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {videoFile && (
-                <div className="p-3 rounded bg-forest-900 border border-emerald-500/20 font-mono text-xs flex items-center justify-between">
+                <div className="p-3.5 rounded-lg bg-forest-900 border border-emerald-500/20 font-mono text-xs flex flex-wrap items-center justify-between gap-3">
                   <span className="text-emerald-300">
-                    Ready to ingest single-pass drone flight video: {videoFile.name}
+                    {videoFile
+                      ? `Ready to ingest drone video: ${videoFile.name} (${(videoFile.size / 1024 / 1024).toFixed(1)} MB)`
+                      : "Please choose a UAV flight video file to upload"}
                   </span>
-                  <Button type="submit" variant="primary" size="sm" isLoading={videoUploading}>
-                    Upload Drone Video &amp; Initialize Mission
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    disabled={!videoFile || videoUploading}
+                    isLoading={videoUploading}
+                    className="font-bold font-mono"
+                  >
+                    <Video className="w-3.5 h-3.5 mr-1.5" />
+                    {videoUploading ? "Ingesting Drone Video..." : "Upload Drone Video & Ingest"}
                   </Button>
                 </div>
-              )}
 
-              {uploadStatus && (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  className={`p-3 rounded text-xs font-mono flex items-start gap-2 ${
-                    uploadStatus.kind === "success"
-                      ? "bg-forest-900/90 border border-emerald-500/30 text-emerald-300"
-                      : "bg-rose-950/60 border border-rose-500/40 text-rose-300"
-                  }`}
-                >
-                  {uploadStatus.kind === "success" ? (
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                {uploadStatus && (
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className={`p-3 rounded text-xs font-mono flex items-start gap-2 ${
+                      uploadStatus.kind === "success"
+                        ? "bg-forest-900/90 border border-emerald-500/30 text-emerald-300"
+                        : "bg-rose-950/60 border border-rose-500/40 text-rose-300"
+                    }`}
+                  >
+                    {uploadStatus.kind === "success" ? (
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                    )}
+                    <span>{uploadStatus.message}</span>
+                  </div>
+                )}
+              </form>
+            )}
+
+            {/* Mode 2: Still Aerial Images Upload Form */}
+            {uploadMode === "images" && (
+              <form onSubmit={handleUploadSubmit} className="glass-panel p-6 rounded-xl border border-emerald-500/25 space-y-4">
+                <div className="border-2 border-dashed border-emerald-500/30 rounded-lg p-8 flex flex-col items-center justify-center text-center hover:border-emerald-500/60 transition-colors bg-forest-950/40 relative">
+                  <UploadCloud className="w-12 h-12 text-emerald-400 mb-2" />
+                  <p className="text-sm font-bold text-white font-mono">
+                    Select Aerial Frame Captures
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1 max-w-md">
+                    JPEG, PNG, TIFF, DNG orthophotos or multi-view aerial camera snapshots
+                  </p>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,.tif,.tiff,.dng"
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        setUploadFiles(Array.from(e.target.files));
+                      }
+                    }}
+                    className="mt-4 text-xs font-mono text-emerald-400 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-mono file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 cursor-pointer"
+                  />
+                  {uploadFiles.length > 0 && (
+                    <div className="mt-3 text-xs font-mono text-emerald-300 font-semibold">
+                      {uploadFiles.length} file(s) selected for ingestion
+                    </div>
                   )}
-                  <span>{uploadStatus.message}</span>
                 </div>
-              )}
-            </form>
+
+                <div className="p-3.5 rounded-lg bg-forest-900 border border-emerald-500/20 font-mono text-xs flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-emerald-300">
+                    {uploadFiles.length > 0
+                      ? `Ready to upload ${uploadFiles.length} frame(s) to ${currentProject?.name}`
+                      : "Select one or more image files above"}
+                  </span>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    disabled={uploadFiles.length === 0 || uploading}
+                    isLoading={uploading}
+                    className="font-bold font-mono"
+                  >
+                    <UploadCloud className="w-3.5 h-3.5 mr-1.5" />
+                    {uploading ? "Uploading Frames..." : `Ingest ${uploadFiles.length || ""} Frame(s)`}
+                  </Button>
+                </div>
+
+                {uploadStatus && (
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className={`p-3 rounded text-xs font-mono flex items-start gap-2 ${
+                      uploadStatus.kind === "success"
+                        ? "bg-forest-900/90 border border-emerald-500/30 text-emerald-300"
+                        : "bg-rose-950/60 border border-rose-500/40 text-rose-300"
+                    }`}
+                  >
+                    {uploadStatus.kind === "success" ? (
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                    )}
+                    <span>{uploadStatus.message}</span>
+                  </div>
+                )}
+              </form>
+            )}
 
             {/* Ingested Drone Videos & Pipeline Dispatcher */}
             {projectVideos.length > 0 && (
@@ -1077,7 +1098,7 @@ export default function DashboardPage() {
                       <div className="p-2 rounded bg-forest-900 border border-emerald-500/20 text-emerald-300">3. Duplicate dHash Filter</div>
                       <div className="p-2 rounded bg-forest-900 border border-emerald-500/20 text-emerald-300">4. Depth Anything V2</div>
                       <div className="p-2 rounded bg-forest-900 border border-emerald-500/20 text-emerald-300">5. Dynamic YOLO Mask</div>
-                      <div className="p-2 rounded bg-forest-900 border border-emerald-500/20 text-emerald-300">6. COLMAP SfM Tracking</div>
+                      <div className="p-2 rounded bg-forest-900 border border-emerald-500/20 text-emerald-300">6. 3D Surface Photogrammetry</div>
                       <div className="p-2 rounded bg-forest-900 border border-emerald-500/20 text-emerald-300">7. Dense MVS Point Cloud</div>
                       <div className="p-2 rounded bg-forest-900 border border-emerald-500/20 text-emerald-300">8. Georeferenced Mesh</div>
                     </div>
@@ -1086,48 +1107,89 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Extracted Frames Gallery */}
+            {/* Extracted / Uploaded Frames Gallery */}
             <div className="space-y-4">
-              <h3 className="text-sm font-bold text-white font-mono flex items-center gap-2">
-                <FileCheck2 className="w-4 h-4 text-emerald-400" />
-                EXTRACTED AERIAL FRAMES &amp; TELEMETRY ({images.length})
+              <h3 className="text-sm font-bold text-white font-mono flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <FileCheck2 className="w-4 h-4 text-emerald-400" />
+                  INGESTED AERIAL FRAMES &amp; TELEMETRY ({images.length})
+                </span>
+                {images.length > 0 && (
+                  <Button
+                    onClick={() => setActiveTab("ai")}
+                    variant="outline"
+                    size="sm"
+                    className="text-[11px]"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 mr-1 text-emerald-400" /> Analyze in AI Hub
+                  </Button>
+                )}
               </h3>
 
               {images.length === 0 ? (
                 <div className="p-8 rounded-lg border border-dashed border-emerald-500/20 text-center font-mono text-xs text-muted-foreground bg-forest-950/30">
-                  No frames extracted yet. Upload a drone video and click &quot;RUN 3D RECONSTRUCTION&quot; to decode keyframes.
+                  No frames ingested yet for this mission. Upload a drone video or batch image frames above.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {images.map((img) => (
+                  {images.map((img, idx) => (
                     <div key={img.id} className="glass-panel p-4 rounded-lg border border-emerald-500/20 flex flex-col sm:flex-row gap-4 font-mono text-xs">
                       <div className="w-full sm:w-44 h-32 rounded overflow-hidden shrink-0 bg-forest-950 border border-emerald-500/20">
                         <img
-                          src={img.thumbnail_path}
+                          src={toMediaUrl(img.thumbnail_path || img.file_path)}
                           alt={img.filename}
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      <div className="flex-1 space-y-1.5">
-                        <div className="text-white font-bold text-xs truncate">
-                          {img.filename}
-                        </div>
-                        <div className="text-[11px] text-muted-foreground">
-                          {img.width}x{img.height} px | {(img.file_size_bytes / 1024 / 1024).toFixed(1)} MB | {img.format}
-                        </div>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {img.telemetry?.latitude && img.telemetry?.longitude ? (
-                            <Badge variant="tactical" className="text-[10px]">
-                              GPS: {img.telemetry.latitude.toFixed(4)}, {img.telemetry.longitude.toFixed(4)}
+                      <div className="flex-1 space-y-1.5 flex flex-col justify-between">
+                        <div>
+                          <div className="text-white font-bold text-xs truncate">
+                            {img.filename}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {img.width}x{img.height} px | {(img.file_size_bytes / 1024 / 1024).toFixed(1)} MB | {img.format}
+                          </div>
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {img.telemetry?.latitude && img.telemetry?.longitude ? (
+                              <Badge variant="tactical" className="text-[10px]">
+                                GPS: {img.telemetry.latitude.toFixed(4)}, {img.telemetry.longitude.toFixed(4)}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                                Local Frame
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="text-[10px] text-emerald-400">
+                              Frame #{idx + 1}
                             </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                              No GPS
-                            </Badge>
-                          )}
-                          <Badge variant="outline" className="text-[10px] text-emerald-400">
-                            Frame #{img.id.slice(0, 6)}
-                          </Badge>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-2 border-t border-emerald-500/15">
+                          <Button
+                            onClick={() => {
+                              setSelectedImageId(img.id);
+                              setActiveTab("ai");
+                              setAiSubTab("depth");
+                            }}
+                            variant="tactical"
+                            size="sm"
+                            className="text-[10px] h-6 px-2"
+                          >
+                            Depth
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              setSelectedImageId(img.id);
+                              setActiveTab("ai");
+                              setAiSubTab("segmentation");
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="text-[10px] h-6 px-2"
+                          >
+                            Segment
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -1135,140 +1197,6 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-
-            {/* Optional / Fallback Still Orthophoto Upload */}
-            <details className="glass-panel p-4 rounded-lg border border-emerald-500/15 font-mono text-xs">
-              <summary className="cursor-pointer text-muted-foreground hover:text-emerald-300 font-bold">
-                Batch Image Ingestion (Optional Orthophoto Mode)
-              </summary>
-              <form onSubmit={handleUploadSubmit} className="mt-4 space-y-3">
-                <p className="text-[11px] text-muted-foreground">
-                  Ingest pre-extracted still aerial frames (TIFF, JPEG, PNG, DNG) directly into the project:
-                </p>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*,.tif,.tiff,.dng"
-                  onChange={(e) => {
-                    if (e.target.files) {
-                      setUploadFiles(Array.from(e.target.files));
-                    }
-                  }}
-                  className="text-xs font-mono text-emerald-400 file:mr-3 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:bg-emerald-700 file:text-white cursor-pointer"
-                />
-                {uploadFiles.length > 0 && (
-                  <Button type="submit" variant="primary" size="sm" isLoading={uploading}>
-                    Ingest Still Images ({uploadFiles.length})
-                  </Button>
-<<<<<<< HEAD
-                )}
-              </form>
-            </details>
-=======
-                </div>
-              )}
-
-              {uploadStatus && (
-<<<<<<< HEAD
-                <div className="p-3 rounded bg-forest-900/90 border border-emerald-500/30 text-xs font-mono text-emerald-300">
-                  {uploadStatus}
-                </div>
-              )}
-=======
-                <div
-                  role="status"
-                  aria-live="polite"
-                  className={`p-3 rounded text-xs font-mono flex items-start gap-2 ${
-                    uploadStatus.kind === "success"
-                      ? "bg-forest-900/90 border border-emerald-500/30 text-emerald-300"
-                      : "bg-rose-950/60 border border-rose-500/40 text-rose-300"
-                  }`}
-                >
-                  {uploadStatus.kind === "success" ? (
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                  )}
-                  <span>{uploadStatus.message}</span>
-                </div>
-              )}
-
-              {uploadStatus?.kind === "error" && uploadFiles.length > 0 && (
-                <Button
-                  type="submit"
-                  variant="outline"
-                  size="sm"
-                  isLoading={uploading}
-                >
-                  <RefreshCw className="w-3.5 h-3.5 mr-1" /> Retry upload
-                </Button>
-              )}
->>>>>>> 0400f2f (p5-udpated)
-            </form>
-
-            {/* Current Project Image Inventory */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-white font-mono flex items-center gap-2">
-                <FileCheck2 className="w-4 h-4 text-emerald-400" />
-                INGESTED AERIAL FRAMES &amp; TELEMETRY ({images.length})
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {images.map((img) => (
-                  <div key={img.id} className="glass-panel p-4 rounded-lg border border-emerald-500/20 flex flex-col sm:flex-row gap-4 font-mono text-xs">
-                    <div className="w-full sm:w-44 h-32 rounded overflow-hidden shrink-0 bg-forest-950 border border-emerald-500/20">
-                      <img
-                        src={img.thumbnail_path}
-                        alt={img.filename}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 space-y-1.5">
-                      <div className="text-white font-bold text-xs truncate">
-                        {img.filename}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {img.width}x{img.height} px | {(img.file_size_bytes / 1024 / 1024).toFixed(1)} MB | {img.format}
-                      </div>
-
-                      {img.telemetry && (
-                        <div className="p-2 rounded bg-forest-900/80 border border-emerald-500/15 text-[10px] space-y-0.5 text-muted-foreground">
-                          <div>CAMERA: <span className="text-emerald-300">{img.telemetry.camera_make} {img.telemetry.camera_model}</span></div>
-                          <div>ALTITUDE: <span className="text-white font-semibold">{img.telemetry.altitude_m} m AGL</span></div>
-                          <div>GPS: <span className="text-white">{img.telemetry.latitude}°N, {img.telemetry.longitude}°E</span></div>
-                        </div>
-                      )}
-
-                      <div className="pt-2 flex items-center gap-2">
-                        <Button
-                          onClick={() => {
-                            setActiveTab("ai");
-                            triggerDepth(img.id);
-                          }}
-                          variant="tactical"
-                          size="sm"
-                          className="text-[10px] h-6 px-2"
-                        >
-                          Estimate Depth
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            setActiveTab("ai");
-                            triggerSegmentation(img.id);
-                          }}
-                          variant="tactical"
-                          size="sm"
-                          className="text-[10px] h-6 px-2"
-                        >
-                          Segment
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
->>>>>>> origin/main
           </div>
         )}
 
@@ -1281,15 +1209,10 @@ export default function DashboardPage() {
               <div>
                 <h2 className="text-xl font-bold text-white font-mono">Neural Inference Engine</h2>
                 <p className="text-xs text-muted-foreground">
-                  Execute deep learning pipelines on aerial captures.
+                  Execute deep learning pipelines on aerial captures for <span className="text-emerald-300 font-bold">{currentProject?.name}</span>.
                 </p>
               </div>
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> origin/main
               {analysisError && (
                 <div className="w-full p-3 rounded bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs font-mono flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -1297,19 +1220,15 @@ export default function DashboardPage() {
                 </div>
               )}
 
-<<<<<<< HEAD
-=======
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
               {/* Sub-tabs for Depth, Segmentation, Damage, Change */}
               <div className="flex items-center gap-1.5 glass-panel p-1 rounded font-mono text-xs">
                 {(["depth", "segmentation", "damage", "change"] as const).map((sub) => (
                   <button
                     key={sub}
                     onClick={() => setAiSubTab(sub)}
-                    className={`px-3 py-1.5 rounded uppercase transition-all ${
+                    className={`px-3 py-1.5 rounded uppercase transition-all font-bold ${
                       aiSubTab === sub
-                        ? "bg-emerald-600 text-white font-bold"
+                        ? "bg-emerald-600 text-white"
                         : "text-muted-foreground hover:bg-forest-800 hover:text-white"
                     }`}
                   >
@@ -1319,212 +1238,561 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* AI SUB-TAB 1: DEPTH MAPS */}
-            {aiSubTab === "depth" && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="font-mono text-xs">
-                    <span className="text-sky-400 font-bold">DEPTH ANYTHING V2 SMALL:</span>
-                    <span className="text-muted-foreground ml-2">
-                      Relative inverse depth (no metric claim unless calibrated)
-                    </span>
-                  </div>
-                  <Button
-                    onClick={() => triggerDepth("img-pre-01")}
-                    variant="primary"
-                    size="sm"
-                    isLoading={activeInferencing === "depth"}
-                  >
-                    Run Depth Estimation
-                  </Button>
-                </div>
-
-                {depthResult && (
-                  <div className="glass-panel p-6 rounded-xl border border-emerald-500/20 space-y-4">
-                    <DepthViewer
-                      originalImage="https://images.unsplash.com/photo-1508873696983-2df5293cb32f?auto=format&fit=crop&w=1200&q=80"
-                      depthMapUrl={depthResult.colormap_path}
-                      minDepth={depthResult.min_depth_m}
-                      maxDepth={depthResult.max_depth_m}
-                      meanDepth={depthResult.mean_depth_m}
-                      relativeMin={depthResult.relative_min}
-                      relativeMax={depthResult.relative_max}
-                      relativeMean={depthResult.relative_mean}
-                      depthType={depthResult.depth_type}
-                      modelLabel={depthResult.model_label}
-                    />
-
-                    <div className="p-3 rounded bg-forest-900 border border-emerald-500/15 font-mono text-xs flex flex-wrap items-center justify-between gap-4">
-                      <div>RESULT ID: <span className="text-white">{depthResult.id}</span></div>
-                      <div>JOB ID: <span className="text-emerald-300">{depthResult.job_id}</span></div>
-                      <div>SURFACE MESH: <span className="text-sky-300">{depthResult.mesh_obj_path}</span></div>
-                    </div>
-                  </div>
-                )}
+            {/* If no images exist in this mission, display helpful prompt */}
+            {images.length === 0 ? (
+              <div className="p-8 rounded-lg border border-dashed border-emerald-500/25 bg-forest-950/60 text-center font-mono">
+                <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-2" />
+                <h3 className="text-white font-bold text-sm">No Aerial Images in Active Mission</h3>
+                <p className="text-muted-foreground text-xs mt-1 max-w-md mx-auto">
+                  Upload a drone flight video or still aerial frames in the Ingestion tab first to run neural depth, segmentation, or damage evaluation.
+                </p>
+                <Button onClick={() => setActiveTab("upload")} variant="primary" size="sm" className="mt-4">
+                  <Video className="w-4 h-4 mr-1.5" /> Go to Drone Ingestion
+                </Button>
               </div>
-            )}
-
-            {/* AI SUB-TAB 2: SEGMENTATION */}
-            {aiSubTab === "segmentation" && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="font-mono text-xs">
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-                    <span className="text-emerald-400 font-bold">SEGFORMER-B4:</span>
-                    <span className="text-muted-foreground ml-2">8-class aerial land-cover categorization</span>
-=======
->>>>>>> origin/main
-                    <span className="text-emerald-400 font-bold">AERIAL LAND-COVER SEGMENTATION:</span>
-                    <span className="text-muted-foreground ml-2">
-                      7-class aerial land-cover categorisation (requires a verified checkpoint)
-                    </span>
-<<<<<<< HEAD
-=======
->>>>>>> 0400f2f (p5-udpated)
->>>>>>> origin/main
-                  </div>
-                  <Button
-                    onClick={() => triggerSegmentation("img-pre-01")}
-                    variant="primary"
-                    size="sm"
-                    isLoading={activeInferencing === "segmentation"}
-                  >
-                    Run Segmentation
-                  </Button>
-                </div>
-
-                {segmentationResult && (
-                  <div className="glass-panel p-6 rounded-xl border border-emerald-500/20 space-y-4">
-                    <div className="relative rounded-lg overflow-hidden border border-emerald-500/30 aspect-video">
-                      <img
-                        src={segmentationResult.overlay_path}
-                        alt="Segmentation Overlay"
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-tr from-emerald-900/40 via-purple-900/30 to-blue-900/30 mix-blend-overlay pointer-events-none" />
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 font-mono text-xs">
-                      {Object.entries(segmentationResult.class_distribution).map(([cls, pct]) => (
-                        <div key={cls} className="p-2.5 rounded bg-forest-900 border border-emerald-500/15 text-center">
-                          <div className="text-[10px] text-muted-foreground uppercase">{cls}</div>
-                          <div className="text-emerald-400 font-bold text-sm mt-0.5">{pct}%</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 font-mono text-xs text-muted-foreground">
-                      <span>VECTOR GEODATA: {segmentationResult.geojson_path}</span>
-                      <button
-                        onClick={() => alert("GeoJSON building polygons exported to local downloads.")}
-                        className="text-emerald-400 hover:underline flex items-center gap-1 font-bold"
+            ) : (
+              <>
+                {/* Frame Selector Bar */}
+                {(aiSubTab === "depth" || aiSubTab === "segmentation") && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg bg-forest-900/60 border border-emerald-500/20 font-mono text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground uppercase text-[11px]">ACTIVE FRAME:</span>
+                      <select
+                        value={selectedImageId}
+                        onChange={(e) => setSelectedImageId(e.target.value)}
+                        className="bg-forest-950 border border-emerald-500/30 text-emerald-300 rounded px-3 py-1 font-mono text-xs focus:outline-none focus:border-emerald-400"
                       >
-                        <Download className="w-3.5 h-3.5" /> Download GeoJSON
-                      </button>
+                        {images.map((img, idx) => (
+                          <option key={img.id} value={img.id}>
+                            Frame #{idx + 1}: {img.filename}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {images.length} frame(s) connected to mission
                     </div>
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* AI SUB-TAB 3: DAMAGE ASSESSMENT */}
-            {aiSubTab === "damage" && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="font-mono text-xs">
-                    <span className="text-rose-400 font-bold">xBD DISASTER TRIAGE:</span>
-                    <span className="text-muted-foreground ml-2">4-tier structural collapse classification</span>
-                  </div>
-                  <Button
-                    onClick={() => triggerDamage("img-pre-01", "img-post-01")}
-                    variant="primary"
-                    size="sm"
-                    isLoading={activeInferencing === "damage"}
-                  >
-                    Run Damage Evaluation
-                  </Button>
-                </div>
-
-                {damageResult && (
-                  <div className="glass-panel p-6 rounded-xl border border-emerald-500/20 space-y-4">
-                    <BeforeAfterSlider
-                      beforeImage="https://images.unsplash.com/photo-1508873696983-2df5293cb32f?auto=format&fit=crop&w=1200&q=80"
-                      afterImage="https://images.unsplash.com/photo-1547683905-f686c993aae5?auto=format&fit=crop&w=1200&q=80"
-                      beforeLabel="Pre-Disaster Baseline"
-                      afterLabel="Post-Disaster Triage"
-                    />
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
-                      <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
-                        <div className="text-[10px] text-muted-foreground">NO DAMAGE</div>
-                        <div className="text-emerald-400 font-bold text-base mt-0.5">
-                          {damageResult.counts_by_level.no_damage} Buildings
-                        </div>
-                      </div>
-                      <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
-                        <div className="text-[10px] text-muted-foreground">MINOR DAMAGE</div>
-                        <div className="text-amber-300 font-bold text-base mt-0.5">
-                          {damageResult.counts_by_level.minor_damage} Buildings
-                        </div>
-                      </div>
-                      <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
-                        <div className="text-[10px] text-muted-foreground">MAJOR DAMAGE</div>
-                        <div className="text-orange-400 font-bold text-base mt-0.5">
-                          {damageResult.counts_by_level.major_damage} Buildings
-                        </div>
-                      </div>
-                      <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
-                        <div className="text-[10px] text-muted-foreground">DESTROYED</div>
-                        <div className="text-rose-400 font-bold text-base mt-0.5">
-                          {damageResult.counts_by_level.destroyed} Buildings
-                        </div>
-                      </div>
+                {(aiSubTab === "damage" || aiSubTab === "change") && (
+                  <div className="flex flex-wrap items-center gap-4 p-3 rounded-lg bg-forest-900/60 border border-emerald-500/20 font-mono text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground uppercase text-[11px]">PRE-EVENT FRAME:</span>
+                      <select
+                        value={selectedImageId}
+                        onChange={(e) => setSelectedImageId(e.target.value)}
+                        className="bg-forest-950 border border-emerald-500/30 text-emerald-300 rounded px-2.5 py-1 text-xs"
+                      >
+                        {images.map((img, idx) => (
+                          <option key={img.id} value={img.id}>
+                            Frame #{idx + 1}: {img.filename}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-
-                    <div className="p-3 rounded bg-forest-900/90 border border-emerald-500/15 font-mono text-xs flex justify-between">
-                      <span className="text-muted-foreground">COMPOSITE SEVERITY INDEX:</span>
-                      <span className="text-rose-400 font-bold">
-                        {damageResult.severity_index} ({damageResult.damage_percentage}% altered)
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground uppercase text-[11px]">POST-EVENT FRAME:</span>
+                      <select
+                        value={selectedPostImageId}
+                        onChange={(e) => setSelectedPostImageId(e.target.value)}
+                        className="bg-forest-950 border border-emerald-500/30 text-emerald-300 rounded px-2.5 py-1 text-xs"
+                      >
+                        {images.map((img, idx) => (
+                          <option key={img.id} value={img.id}>
+                            Frame #{idx + 1}: {img.filename}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* AI SUB-TAB 4: CHANGE DETECTION */}
-            {aiSubTab === "change" && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="font-mono text-xs">
-                    <span className="text-amber-400 font-bold">BI-TEMPORAL DIFFERENCING:</span>
-                    <span className="text-muted-foreground ml-2">Photometric and structural shift heatmap</span>
-                  </div>
-                  <Button
-                    onClick={() => triggerChange("img-pre-01", "img-post-01")}
-                    variant="primary"
-                    size="sm"
-                    isLoading={activeInferencing === "change"}
-                  >
-                    Run Change Differencing
-                  </Button>
-                </div>
+                {/* AI SUB-TAB 1: DEPTH MAPS */}
+                {aiSubTab === "depth" && (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="font-mono text-xs">
+                        <span className="text-sky-400 font-bold">DEPTH ANYTHING V2 SMALL:</span>
+                        <span className="text-muted-foreground ml-2">
+                          Relative inverse depth on {activeImage?.filename || "selected frame"}
+                        </span>
+                      </div>
+                      <Button
+                        onClick={() => triggerDepth(selectedImageId)}
+                        variant="primary"
+                        size="sm"
+                        isLoading={activeInferencing === "depth"}
+                      >
+                        Run Depth Estimation
+                      </Button>
+                    </div>
 
-                {changeResult && (
-                  <div className="glass-panel p-6 rounded-xl border border-emerald-500/20 space-y-4">
-                    <BeforeAfterSlider
-                      beforeImage="https://images.unsplash.com/photo-1508873696983-2df5293cb32f?auto=format&fit=crop&w=1200&q=80"
-                      afterImage="https://images.unsplash.com/photo-1547683905-f686c993aae5?auto=format&fit=crop&w=1200&q=80"
-                      beforeLabel="Before"
-                      afterLabel="After"
-                    />
+                    {depthResult ? (
+                      <div className="glass-panel p-6 rounded-xl border border-emerald-500/20 space-y-4">
+                        <DepthViewer
+                          originalImage={toMediaUrl(activeImage?.file_path || activeImage?.thumbnail_path)}
+                          depthMapUrl={toMediaUrl(depthResult.colormap_path)}
+                          minDepth={depthResult.min_depth_m}
+                          maxDepth={depthResult.max_depth_m}
+                          meanDepth={depthResult.mean_depth_m}
+                          relativeMin={depthResult.relative_min}
+                          relativeMax={depthResult.relative_max}
+                          relativeMean={depthResult.relative_mean}
+                          depthType={depthResult.depth_type}
+                          modelLabel={depthResult.model_label}
+                        />
+
+                        <div className="p-3 rounded bg-forest-900 border border-emerald-500/15 font-mono text-xs flex flex-wrap items-center justify-between gap-4">
+                          <div>RESULT ID: <span className="text-white">{depthResult.id}</span></div>
+                          <div>JOB ID: <span className="text-emerald-300">{depthResult.job_id}</span></div>
+                          {depthResult.mesh_obj_path && (
+                            <div>SURFACE MESH: <span className="text-sky-300">{depthResult.mesh_obj_path}</span></div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="glass-panel p-8 rounded-xl border border-dashed border-emerald-500/20 text-center flex flex-col items-center justify-center gap-3">
+                        {activeImage?.file_path && (
+                          <div className="w-full max-w-lg aspect-video rounded-lg overflow-hidden border border-emerald-500/30 relative mb-2">
+                            <img
+                              src={toMediaUrl(activeImage.file_path)}
+                              alt={activeImage.filename}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                              <span className="font-mono text-xs bg-forest-950/90 text-sky-300 border border-emerald-500/30 px-3 py-1.5 rounded">
+                                Selected Frame: {activeImage.filename}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        <p className="text-sm font-mono text-muted-foreground">
+                          Depth map not yet computed for this frame. Run Depth Anything V2 Small neural estimation to compute relative inverse depth and 3D reliefs.
+                        </p>
+                        <Button
+                          onClick={() => triggerDepth(selectedImageId)}
+                          variant="primary"
+                          size="sm"
+                          isLoading={activeInferencing === "depth"}
+                        >
+                          <Sparkles className="w-3.5 h-3.5 mr-1" /> Run Depth Estimation
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
+                {/* AI SUB-TAB 2: SEGMENTATION */}
+                {aiSubTab === "segmentation" && (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="font-mono text-xs">
+                        <span className="text-emerald-400 font-bold">AERIAL LAND-COVER SEGMENTATION:</span>
+                        <span className="text-muted-foreground ml-2">
+                          7-class aerial categorization on {activeImage?.filename || "selected frame"}
+                        </span>
+                      </div>
+                      <Button
+                        onClick={() => triggerSegmentation(selectedImageId)}
+                        variant="primary"
+                        size="sm"
+                        isLoading={activeInferencing === "segmentation"}
+                      >
+                        Run Segmentation
+                      </Button>
+                    </div>
+
+                    {segmentationResult ? (
+                      <div className="glass-panel p-6 rounded-xl border border-emerald-500/20 space-y-4">
+                        <SegmentationOverlay
+                          originalImage={toMediaUrl(activeImage?.file_path || activeImage?.thumbnail_path)}
+                          overlayImage={toMediaUrl(segmentationResult.overlay_path)}
+                          classes={
+                            segmentationResult.class_distribution
+                              ? Object.entries(segmentationResult.class_distribution).map(([cls, pct]) => ({
+                                  id: cls,
+                                  label: cls.charAt(0).toUpperCase() + cls.slice(1),
+                                  color:
+                                    cls === "building"
+                                      ? "#ec4899"
+                                      : cls === "vegetation" || cls === "forest"
+                                      ? "#10b981"
+                                      : cls === "road"
+                                      ? "#3b82f6"
+                                      : cls === "water"
+                                      ? "#06b6d4"
+                                      : cls === "barren" || cls === "soil"
+                                      ? "#f59e0b"
+                                      : cls === "agricultural"
+                                      ? "#84cc16"
+                                      : cls === "vehicle"
+                                      ? "#ef4444"
+                                      : "#94a3b8",
+                                  percentage: Number(pct),
+                                }))
+                              : undefined
+                          }
+                        />
+
+                        <div className="flex items-center justify-between pt-2 font-mono text-xs text-muted-foreground">
+                          <span>VECTOR GEODATA: {segmentationResult.geojson_path || "Building footprints vectorized"}</span>
+                          {segmentationResult.geojson_path && (
+                            <a
+                              href={toMediaUrl(segmentationResult.geojson_path)}
+                              download
+                              className="text-emerald-400 hover:underline flex items-center gap-1 font-bold"
+                            >
+                              <Download className="w-3.5 h-3.5" /> Download GeoJSON
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="glass-panel p-8 rounded-xl border border-dashed border-emerald-500/20 text-center flex flex-col items-center justify-center gap-3">
+                        {activeImage?.file_path && (
+                          <div className="w-full max-w-lg aspect-video rounded-lg overflow-hidden border border-emerald-500/30 relative mb-2">
+                            <img
+                              src={toMediaUrl(activeImage.file_path)}
+                              alt={activeImage.filename}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                              <span className="font-mono text-xs bg-forest-950/90 text-emerald-300 border border-emerald-500/30 px-3 py-1.5 rounded">
+                                Target Frame: {activeImage.filename}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        <p className="text-sm font-mono text-muted-foreground">
+                          No segmentation performed yet for this frame. Run LoveDA 7-class semantic analysis to extract terrain, structures, and roads.
+                        </p>
+                        <Button
+                          onClick={() => triggerSegmentation(selectedImageId)}
+                          variant="primary"
+                          size="sm"
+                          isLoading={activeInferencing === "segmentation"}
+                        >
+                          <Sparkles className="w-3.5 h-3.5 mr-1" /> Run Land-Cover Segmentation
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* AI SUB-TAB 3: DAMAGE ASSESSMENT */}
+                {aiSubTab === "damage" && (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="font-mono text-xs">
+                        <span className="text-rose-400 font-bold">xBD DISASTER TRIAGE:</span>
+                        <span className="text-muted-foreground ml-2">4-tier structural collapse classification</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {damageResult && (
+                          <div className="flex items-center rounded-lg border border-emerald-500/30 bg-forest-950 p-0.5 text-xs font-mono">
+                            <button
+                              onClick={() => setDamageViewMode("overlay")}
+                              className={`px-2.5 py-1 rounded transition-colors ${
+                                damageViewMode === "overlay"
+                                  ? "bg-rose-500/20 text-rose-300 font-bold"
+                                  : "text-muted-foreground hover:text-white"
+                              }`}
+                            >
+                              Triage Overlay
+                            </button>
+                            <button
+                              onClick={() => setDamageViewMode("slider")}
+                              className={`px-2.5 py-1 rounded transition-colors ${
+                                damageViewMode === "slider"
+                                  ? "bg-rose-500/20 text-rose-300 font-bold"
+                                  : "text-muted-foreground hover:text-white"
+                              }`}
+                            >
+                              Pre/Post Slider
+                            </button>
+                          </div>
+                        )}
+                        <Button
+                          onClick={() => triggerDamage(selectedImageId, selectedPostImageId)}
+                          variant="primary"
+                          size="sm"
+                          isLoading={activeInferencing === "damage"}
+                        >
+                          Run Damage Evaluation
+                        </Button>
+                      </div>
+                    </div>
+
+                    {damageResult ? (
+                      <div className="glass-panel p-6 rounded-xl border border-emerald-500/20 space-y-4">
+                        {damageViewMode === "overlay" ? (
+                          <div className="relative rounded-lg overflow-hidden border border-rose-500/30 aspect-video bg-black flex items-center justify-center">
+                            <img
+                              src={toMediaUrl(damageResult.damage_overlay_path || activePostImage?.file_path)}
+                              alt="xBD Damage Classification Overlay"
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute top-3 left-3 bg-forest-950/90 border border-rose-500/40 rounded px-2.5 py-1 font-mono text-[11px] text-rose-300 flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+                              xBD Structural Triage Overlay
+                            </div>
+                          </div>
+                        ) : (
+                          <BeforeAfterSlider
+                            beforeImage={toMediaUrl(activeImage?.file_path || activeImage?.thumbnail_path)}
+                            afterImage={toMediaUrl(damageResult.damage_overlay_path || activePostImage?.file_path)}
+                            beforeLabel="Pre-Disaster Baseline"
+                            afterLabel="Damage Assessment Overlay"
+                          />
+                        )}
+
+                        {damageResult.counts_by_level && (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+                            <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
+                              <div className="text-[10px] text-muted-foreground">NO DAMAGE</div>
+                              <div className="text-emerald-400 font-bold text-base mt-0.5">
+                                {damageResult.counts_by_level.no_damage} Buildings
+                              </div>
+                            </div>
+                            <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
+                              <div className="text-[10px] text-muted-foreground">MINOR DAMAGE</div>
+                              <div className="text-amber-300 font-bold text-base mt-0.5">
+                                {damageResult.counts_by_level.minor_damage} Buildings
+                              </div>
+                            </div>
+                            <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
+                              <div className="text-[10px] text-muted-foreground">MAJOR DAMAGE</div>
+                              <div className="text-orange-400 font-bold text-base mt-0.5">
+                                {damageResult.counts_by_level.major_damage} Buildings
+                              </div>
+                            </div>
+                            <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
+                              <div className="text-[10px] text-muted-foreground">DESTROYED</div>
+                              <div className="text-rose-400 font-bold text-base mt-0.5">
+                                {damageResult.counts_by_level.destroyed} Buildings
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="p-3 rounded bg-forest-900/90 border border-emerald-500/15 font-mono text-xs flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-muted-foreground">COMPOSITE SEVERITY INDEX:</span>
+                          <span className="text-rose-400 font-bold">
+                            {damageResult.severity_index} ({damageResult.damage_percentage}% altered) · {damageResult.total_buildings || 0} Total Buildings Assessed
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="glass-panel p-8 rounded-xl border border-dashed border-emerald-500/20 text-center flex flex-col items-center justify-center gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-xl mb-2">
+                          {activeImage?.file_path && (
+                            <div className="aspect-video rounded-lg overflow-hidden border border-emerald-500/30 relative">
+                              <img
+                                src={toMediaUrl(activeImage.file_path)}
+                                alt={activeImage.filename}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                <span className="font-mono text-[10px] bg-forest-950/90 text-emerald-300 border border-emerald-500/30 px-2 py-1 rounded">
+                                  Pre: {activeImage.filename}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                          {activePostImage?.file_path && (
+                            <div className="aspect-video rounded-lg overflow-hidden border border-emerald-500/30 relative">
+                              <img
+                                src={toMediaUrl(activePostImage.file_path)}
+                                alt={activePostImage.filename}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                <span className="font-mono text-[10px] bg-forest-950/90 text-rose-300 border border-rose-500/30 px-2 py-1 rounded">
+                                  Post: {activePostImage.filename}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-sm font-mono text-muted-foreground">
+                          Damage evaluation has not yet been computed for this frame pair. Run the xBD Siamese model to classify building structural collapse into 4 severity levels.
+                        </p>
+                        <Button
+                          onClick={() => triggerDamage(selectedImageId, selectedPostImageId)}
+                          variant="primary"
+                          size="sm"
+                          isLoading={activeInferencing === "damage"}
+                        >
+                          <ShieldAlert className="w-3.5 h-3.5 mr-1" /> Run Damage Evaluation
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* AI SUB-TAB 4: CHANGE DETECTION */}
+                {aiSubTab === "change" && (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="font-mono text-xs">
+                        <span className="text-amber-400 font-bold">BI-TEMPORAL DIFFERENCING:</span>
+                        <span className="text-muted-foreground ml-2">Photometric and structural shift heatmap</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {changeResult && (
+                          <div className="flex items-center rounded-lg border border-emerald-500/30 bg-forest-950 p-0.5 text-xs font-mono">
+                            <button
+                              onClick={() => setChangeViewMode("heatmap")}
+                              className={`px-2.5 py-1 rounded transition-colors ${
+                                changeViewMode === "heatmap"
+                                  ? "bg-amber-500/20 text-amber-300 font-bold"
+                                  : "text-muted-foreground hover:text-white"
+                              }`}
+                            >
+                              Heatmap
+                            </button>
+                            <button
+                              onClick={() => setChangeViewMode("mask")}
+                              className={`px-2.5 py-1 rounded transition-colors ${
+                                changeViewMode === "mask"
+                                  ? "bg-amber-500/20 text-amber-300 font-bold"
+                                  : "text-muted-foreground hover:text-white"
+                              }`}
+                            >
+                              Diff Mask
+                            </button>
+                            <button
+                              onClick={() => setChangeViewMode("slider")}
+                              className={`px-2.5 py-1 rounded transition-colors ${
+                                changeViewMode === "slider"
+                                  ? "bg-amber-500/20 text-amber-300 font-bold"
+                                  : "text-muted-foreground hover:text-white"
+                              }`}
+                            >
+                              Pre vs Post
+                            </button>
+                          </div>
+                        )}
+                        <Button
+                          onClick={() => triggerChange(selectedImageId, selectedPostImageId)}
+                          variant="primary"
+                          size="sm"
+                          isLoading={activeInferencing === "change"}
+                        >
+                          Run Change Differencing
+                        </Button>
+                      </div>
+                    </div>
+
+                    {changeResult ? (
+                      <div className="glass-panel p-6 rounded-xl border border-emerald-500/20 space-y-4">
+                        {changeViewMode === "heatmap" ? (
+                          <BeforeAfterSlider
+                            beforeImage={toMediaUrl(activeImage?.file_path || activeImage?.thumbnail_path)}
+                            afterImage={toMediaUrl(changeResult.heatmap_path)}
+                            beforeLabel="Pre-Event Baseline"
+                            afterLabel="Change Intensity Heatmap"
+                          />
+                        ) : changeViewMode === "mask" ? (
+                          <BeforeAfterSlider
+                            beforeImage={toMediaUrl(activeImage?.file_path || activeImage?.thumbnail_path)}
+                            afterImage={toMediaUrl(changeResult.diff_mask_path || changeResult.heatmap_path)}
+                            beforeLabel="Pre-Event Baseline"
+                            afterLabel="Binary Differencing Mask"
+                          />
+                        ) : (
+                          <BeforeAfterSlider
+                            beforeImage={toMediaUrl(activeImage?.file_path || activeImage?.thumbnail_path)}
+                            afterImage={toMediaUrl(activePostImage?.file_path || activePostImage?.thumbnail_path)}
+                            beforeLabel="Pre-Disaster (T0)"
+                            afterLabel="Post-Disaster (T1)"
+                          />
+                        )}
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+                          <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
+                            <div className="text-[10px] text-muted-foreground">CHANGED AREA</div>
+                            <div className="text-amber-400 font-bold text-base mt-0.5">
+                              {changeResult.changed_area_pct}%
+                            </div>
+                          </div>
+                          <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
+                            <div className="text-[10px] text-muted-foreground">CHANGED PIXELS</div>
+                            <div className="text-white font-bold text-base mt-0.5">
+                              {changeResult.changed_pixels?.toLocaleString() || "0"} px
+                            </div>
+                          </div>
+                          <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
+                            <div className="text-[10px] text-muted-foreground">SHIFT SIGNIFICANCE</div>
+                            <div className="text-emerald-400 font-bold text-base mt-0.5">
+                              {(changeResult.significance_score * 100).toFixed(1)}%
+                            </div>
+                          </div>
+                          <div className="p-3 rounded bg-forest-900 border border-emerald-500/20">
+                            <div className="text-[10px] text-muted-foreground">DETECTED CLUSTERS</div>
+                            <div className="text-sky-300 font-bold text-base mt-0.5">
+                              {changeResult.detected_regions_count || 1} Regions
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-3 rounded bg-forest-900/90 border border-emerald-500/15 font-mono text-xs flex justify-between">
+                          <span className="text-muted-foreground">HEATMAP ARTIFACT:</span>
+                          <span className="text-amber-300 truncate max-w-[400px]">
+                            {changeResult.heatmap_path}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="glass-panel p-8 rounded-xl border border-dashed border-emerald-500/20 text-center flex flex-col items-center justify-center gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-xl mb-2">
+                          {activeImage?.file_path && (
+                            <div className="aspect-video rounded-lg overflow-hidden border border-emerald-500/30 relative">
+                              <img
+                                src={toMediaUrl(activeImage.file_path)}
+                                alt={activeImage.filename}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                <span className="font-mono text-[10px] bg-forest-950/90 text-emerald-300 border border-emerald-500/30 px-2 py-1 rounded">
+                                  T0 Baseline: {activeImage.filename}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                          {activePostImage?.file_path && (
+                            <div className="aspect-video rounded-lg overflow-hidden border border-emerald-500/30 relative">
+                              <img
+                                src={toMediaUrl(activePostImage.file_path)}
+                                alt={activePostImage.filename}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                <span className="font-mono text-[10px] bg-forest-950/90 text-amber-300 border border-amber-500/30 px-2 py-1 rounded">
+                                  T1 Comparison: {activePostImage.filename}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-sm font-mono text-muted-foreground">
+                          Bi-temporal change differencing not yet computed. Run pixel differencing to detect structural shifts and terrain disruption.
+                        </p>
+                        <Button
+                          onClick={() => triggerChange(selectedImageId, selectedPostImageId)}
+                          variant="primary"
+                          size="sm"
+                          isLoading={activeInferencing === "change"}
+                        >
+                          <GitCompare className="w-3.5 h-3.5 mr-1" /> Run Change Differencing
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -1545,7 +1813,6 @@ export default function DashboardPage() {
               </Button>
             </div>
 
-<<<<<<< HEAD
             <Card className="glass-panel border-emerald-500/25">
               <CardHeader className="p-4 border-b border-emerald-500/15">
                 <CardTitle className="text-sm font-bold font-mono flex items-center gap-2">
@@ -1553,14 +1820,14 @@ export default function DashboardPage() {
                   PRIMARY 3D SPATIAL SURFACE // {currentProject?.name}
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Multi-view SfM dense point cloud and elevation relief mesh.
+                  Multi-view dense photogrammetric point cloud and digital elevation surface.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4">
                 <AdvancedSpatialViewer3D
                   projectName={currentProject?.name}
                   locationName={currentProject?.location_name}
-                  plyUrl={reconResult?.pointcloud_ply_path}
+                  plyUrl={toMediaUrl(reconResult?.pointcloud_ply_path)}
                 />
               </CardContent>
             </Card>
@@ -1591,27 +1858,6 @@ export default function DashboardPage() {
                 {analysisError}
               </div>
             }
-=======
-<<<<<<< HEAD
-            <AdvancedSpatialViewer3D
-              projectName={currentProject?.name}
-              locationName={currentProject?.location_name}
-              initialPointCount={85000}
-=======
-            {analysisError && (
-              <div className="p-3 rounded bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs font-mono flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>{analysisError}</span>
-              </div>
-            )}
-
-            <AdvancedSpatialViewer3D
-              projectName={currentProject?.name}
-              locationName={currentProject?.location_name}
-              plyUrl={reconResult?.pointcloud_ply_path}
->>>>>>> 0400f2f (p5-udpated)
-            />
->>>>>>> origin/main
           </div>
         )}
 
@@ -1689,7 +1935,6 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-<<<<<<< HEAD
               <Card className="glass-panel border-emerald-500/20">
                 <CardHeader className="p-4 border-b border-emerald-500/15">
                   <CardTitle className="text-sm font-bold font-mono">Depth Model</CardTitle>
@@ -1700,29 +1945,6 @@ export default function DashboardPage() {
                   <div>Metric: Relative only (no absolute scale unless calibrated)</div>
                 </CardContent>
               </Card>
-=======
-              <div className="glass-panel p-5 rounded-lg border border-emerald-500/20 font-mono text-xs space-y-3">
-                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
-                  <span className="text-sm font-bold text-white flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-sky-400" />
-                    Depth Anything V2 Small (Relative)
-                  </span>
-                  <Badge variant="tactical">RELATIVE DEPTH</Badge>
-                </div>
-                <div className="space-y-1.5 text-muted-foreground text-[11px]">
-                  <div>BACKBONE: <span className="text-white">DINOv2 ViT-S/14 + DPT head</span></div>
-                  <div>PARAMETERS: <span className="text-white">24.79 Million (6.28 M trainable when fine-tuned)</span></div>
-                  <div>INPUT TENSOR: <span className="text-white">3 x 518 x 518 (RGB float32)</span></div>
-                  <div>OUTPUT: <span className="text-white">relative inverse depth (unitless)</span></div>
-                  <div>LATENCY: <span className="text-emerald-300 font-bold">~185 ms/image on CPU (378 px, measured)</span></div>
-                  <div>
-                    ACCURACY: <span className="text-amber-300">
-                      no metric claim; aligned relative AbsRel 0.071 on the held-out SkyScenes test town
-                    </span>
-                  </div>
-                </div>
-              </div>
->>>>>>> origin/main
 
               <Card className="glass-panel border-emerald-500/20">
                 <CardHeader className="p-4 border-b border-emerald-500/15">
@@ -1766,6 +1988,109 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* CREATE MISSION MODAL */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="glass-panel w-full max-w-lg p-6 rounded-xl border border-emerald-500/40 shadow-2xl relative font-mono text-xs">
+            <div className="flex items-center justify-between mb-4 border-b border-emerald-500/20 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-emerald-400" /> Initialize New Aerial Mission
+                </h3>
+                <p className="text-muted-foreground text-[11px] mt-0.5">
+                  Register survey coordinates and mission metadata.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="p-1 rounded text-muted-foreground hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateProject} className="space-y-4">
+              <div>
+                <label className="text-white block mb-1 font-semibold">Mission Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Coastal Survey Delta"
+                  value={newProject.name}
+                  onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+                  className="w-full bg-forest-950 border border-emerald-500/30 rounded p-2.5 text-white focus:outline-none focus:border-emerald-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-white block mb-1 font-semibold">Location / Sector *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Paradip Port Coastline"
+                  value={newProject.location_name}
+                  onChange={(e) => setNewProject({ ...newProject, location_name: e.target.value })}
+                  className="w-full bg-forest-950 border border-emerald-500/30 rounded p-2.5 text-white focus:outline-none focus:border-emerald-400"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-white block mb-1 font-semibold">Center Latitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={newProject.center_lat}
+                    onChange={(e) =>
+                      setNewProject({ ...newProject, center_lat: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full bg-forest-950 border border-emerald-500/30 rounded p-2.5 text-white focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-white block mb-1 font-semibold">Center Longitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={newProject.center_lon}
+                    onChange={(e) =>
+                      setNewProject({ ...newProject, center_lon: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full bg-forest-950 border border-emerald-500/30 rounded p-2.5 text-white focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-white block mb-1 font-semibold">Mission Description</label>
+                <textarea
+                  rows={2}
+                  placeholder="Survey objectives, flight law, camera sensor details..."
+                  value={newProject.description}
+                  onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                  className="w-full bg-forest-950 border border-emerald-500/30 rounded p-2.5 text-white focus:outline-none focus:border-emerald-400"
+                />
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-emerald-500/20">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" size="sm">
+                  Create Mission
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

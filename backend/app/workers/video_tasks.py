@@ -8,10 +8,7 @@
 """
 from __future__ import annotations
 
-<<<<<<< HEAD
 import json
-=======
->>>>>>> origin/main
 import os
 import time
 import traceback
@@ -21,20 +18,16 @@ from typing import Any, Dict, List, Optional
 import celery
 
 from backend.app.core.database import SessionLocal
-<<<<<<< HEAD
 from backend.app.models.flight_metadata import FlightMetadata
-=======
->>>>>>> origin/main
 from backend.app.models.frame import Frame
+from backend.app.models.image import Image
 from backend.app.models.job import Job
 from backend.app.models.job_log import JobLog
+from backend.app.models.mission import Mission
 from backend.app.models.video import Video
 from backend.app.repositories.job_repo import JobRepository
-<<<<<<< HEAD
 from backend.app.services.duplicate_detector import detect_duplicates_in_batch
-=======
->>>>>>> origin/main
-from backend.app.services.frame_extractor import FrameExtractionConfig
+from backend.app.services.frame_extractor import FrameExtractionConfig, extract_frames_for_video
 from backend.app.services.frame_quality import QualityConfig, analyze_frame_quality, quality_result_to_dict
 from backend.app.services.frame_selection import FrameCandidate, SelectionConfig, select_frames
 from backend.app.services.gps_association import (
@@ -43,12 +36,6 @@ from backend.app.services.gps_association import (
     flight_metadata_to_gps_records,
     parse_csv_telemetry,
 )
-<<<<<<< HEAD
-=======
-def _new_processing_run_id() -> str:
-    import uuid
-    return uuid.uuid4().hex
->>>>>>> origin/main
 from backend.app.services.storage import get_mission_storage
 from backend.app.services.video_probe import (
     VideoLimits,
@@ -58,15 +45,12 @@ from backend.app.services.video_probe import (
 from backend.app.workers.celery_app import celery_app
 
 
-<<<<<<< HEAD
 def _new_processing_run_id() -> str:
     import uuid
 
     return uuid.uuid4().hex
 
 
-=======
->>>>>>> origin/main
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -99,7 +83,6 @@ def _update_job(
 
 
 def _check_cancelled(db, job: Job) -> bool:
-<<<<<<< HEAD
     # Cancellation is written by another request/session, so refresh the row
     # before deciding whether the worker should stop.
     try:
@@ -107,11 +90,6 @@ def _check_cancelled(db, job: Job) -> bool:
     except Exception:
         pass
     return job.status in ("cancelled",)
-=======
-    if job.status in ("cancelled",):
-        return True
-    return False
->>>>>>> origin/main
 
 
 def _ensure_processing_run(job: Job, db) -> str:
@@ -880,5 +858,215 @@ def cancel_video_processing_task(job_id: str) -> Dict[str, Any]:
         job = _update_job(db, job, status="cancelled", error_message="Cancelled by user")
         _log(job_id, db, "Video processing cancelled")
         return {"status": "cancelled", "job_id": job.id}
+    finally:
+        db.close()
+
+
+def run_pipeline_direct(
+    job_id: str,
+    video_id: str,
+    mission_id: str,
+    video_storage_path: str,
+    processing_run_id: Optional[str] = None,
+    video_processing_config: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Run the video processing pipeline directly in-process without requiring Celery/Redis.
+    
+    Validates, probes metadata, extracts keyframes, filters blur/duplicates, associates telemetry,
+    and automatically registers extracted frames into the project's images table for instant display.
+    """
+    import uuid
+    db = SessionLocal()
+    job = None
+    try:
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            return {"status": "failed", "reason": f"Job {job_id} not found"}
+
+        run_id = processing_run_id or _ensure_processing_run(job, db)
+        _update_job(db, job, status="processing", stage="upload_validation", progress_pct=10)
+        _log(job_id, db, f"Starting direct pipeline run; run_id={run_id}")
+
+        cfg = dict(video_processing_config or {})
+        if cfg.get("sample_interval_seconds") is None:
+            cfg["sample_interval_seconds"] = 1.0  # 1 frame per second
+        if cfg.get("max_frames") is None:
+            cfg["max_frames"] = 30  # cap at 30 keyframes for responsive UI
+
+        # Stage 1: Validate
+        val_res = validate_video_task.run(
+            job_id=job_id,
+            video_id=video_id,
+            video_storage_path=video_storage_path,
+            video_processing_config=cfg,
+        )
+        if val_res.get("status") != "completed":
+            _log(job_id, db, f"Validation stage failed: {val_res}", level="ERROR")
+            return val_res
+
+        # Stage 2: Metadata
+        meta_res = extract_metadata_task.run(
+            job_id=job_id,
+            video_id=video_id,
+            video_storage_path=video_storage_path,
+            video_processing_config=cfg,
+        )
+        if meta_res.get("status") != "completed":
+            _log(job_id, db, f"Metadata stage failed: {meta_res}", level="ERROR")
+            return meta_res
+
+        # Stage 3: Frame extraction
+        ext_res = extract_frames_task.run(
+            job_id=job_id,
+            video_id=video_id,
+            mission_id=mission_id,
+            video_storage_path=video_storage_path,
+            processing_run_id=run_id,
+            video_processing_config=cfg,
+        )
+        if ext_res.get("status") != "completed":
+            _log(job_id, db, f"Frame extraction stage failed: {ext_res}", level="ERROR")
+            return ext_res
+
+        # Stage 4: Quality analysis
+        qual_res = analyze_quality_task.run(
+            job_id=job_id,
+            video_id=video_id,
+            mission_id=mission_id,
+            processing_run_id=run_id,
+            video_processing_config=cfg,
+        )
+
+        # Stage 5: Duplicate detection
+        dup_res = detect_duplicates_task.run(
+            job_id=job_id,
+            video_id=video_id,
+            mission_id=mission_id,
+            processing_run_id=run_id,
+            video_processing_config=cfg,
+        )
+
+        # Stage 6: Selection
+        sel_res = select_frames_task.run(
+            job_id=job_id,
+            video_id=video_id,
+            mission_id=mission_id,
+            processing_run_id=run_id,
+            video_processing_config=cfg,
+        )
+
+        # Stage 7: GPS association
+        gps_res = associate_gps_task.run(
+            job_id=job_id,
+            video_id=video_id,
+            mission_id=mission_id,
+            processing_run_id=run_id,
+            video_processing_config=cfg,
+            telemetry_csv_path=cfg.get("telemetry_csv_path"),
+        )
+
+        # Stage 8: Register frames into the project's images table
+        mission = db.query(Mission).filter(Mission.id == mission_id).first()
+        if mission and mission.project_id:
+            frames = (
+                db.query(Frame)
+                .filter(Frame.video_id == video_id, Frame.processing_run_id == run_id)
+                .order_by(Frame.frame_index)
+                .all()
+            )
+            target_frames = [f for f in frames if f.is_selected] or frames
+            registered_count = 0
+            for f in target_frames:
+                existing_img = (
+                    db.query(Image)
+                    .filter(Image.project_id == mission.project_id, Image.file_path == f.storage_path)
+                    .first()
+                )
+                if not existing_img:
+                    telem = None
+                    if f.gps_latitude is not None and f.gps_longitude is not None:
+                        telem = json.dumps({
+                            "latitude": f.gps_latitude,
+                            "longitude": f.gps_longitude,
+                            "altitude": f.altitude,
+                            "timestamp": f.gps_timestamp_str or f.timestamp_seconds,
+                        })
+                    img = Image(
+                        id=str(uuid.uuid4()),
+                        project_id=mission.project_id,
+                        filename=f"frame_{f.frame_index:04d}.jpg",
+                        file_path=f.storage_path,
+                        thumbnail_path=f.storage_path,
+                        file_size_bytes=os.path.getsize(f.storage_path) if os.path.isfile(f.storage_path) else 0,
+                        width=f.width or 1920,
+                        height=f.height or 1080,
+                        format="JPEG",
+                        telemetry_json=telem,
+                    )
+                    db.add(img)
+                    registered_count += 1
+            db.commit()
+            _log(job_id, db, f"Registered {registered_count} keyframes into project imagery repository")
+
+            # Stage 9: Automatically reconstruct 3D spatial model from extracted frames
+            try:
+                from backend.app.services.photogrammetry import photogrammetry_service
+                from backend.app.models.reconstruction import Reconstruction3D
+                from backend.app.core.config import settings
+
+                proj_images = (
+                    db.query(Image)
+                    .filter(Image.project_id == mission.project_id)
+                    .order_by(Image.created_at.asc())
+                    .all()
+                )
+                if len(proj_images) >= 2:
+                    _log(job_id, db, f"Starting automatic 3D spatial reconstruction with {len(proj_images)} frames...")
+                    ply_path = os.path.join(settings.RECONSTRUCTION_DIR, f"pointcloud_{mission.project_id}.ply")
+                    mesh_path = os.path.join(settings.RECONSTRUCTION_DIR, f"mesh_{mission.project_id}.obj")
+                    recon_res = photogrammetry_service.reconstruct_3d_pointcloud(
+                        image_paths=[img.file_path for img in proj_images],
+                        output_ply_path=ply_path,
+                        output_mesh_path=mesh_path,
+                    )
+                    mesh_artifact = recon_res.get("mesh_glb_path") or recon_res.get("mesh_obj_path")
+                    recon_rec = (
+                        db.query(Reconstruction3D)
+                        .filter(Reconstruction3D.project_id == mission.project_id)
+                        .first()
+                    )
+                    if not recon_rec:
+                        recon_rec = Reconstruction3D(
+                            project_id=mission.project_id,
+                            job_id=job.id,
+                            pointcloud_ply_path=recon_res["pointcloud_ply_path"],
+                            mesh_obj_path=mesh_artifact,
+                            num_points=recon_res["num_points"],
+                            camera_count=recon_res["camera_count"],
+                            reprojection_error_px=recon_res["reprojection_error_px"],
+                            bounds_json=json.dumps(recon_res["bounds"]),
+                        )
+                        db.add(recon_rec)
+                    else:
+                        recon_rec.pointcloud_ply_path = recon_res["pointcloud_ply_path"]
+                        recon_rec.mesh_obj_path = mesh_artifact
+                        recon_rec.num_points = recon_res["num_points"]
+                        recon_rec.camera_count = recon_res["camera_count"]
+                        recon_rec.reprojection_error_px = recon_res["reprojection_error_px"]
+                        recon_rec.bounds_json = json.dumps(recon_res["bounds"])
+                    db.commit()
+                    _log(job_id, db, f"3D model generated: {recon_res['num_points']} points")
+            except Exception as e:
+                _log(job_id, db, f"Notice on automatic 3D spatial reconstruction: {e}", level="WARN")
+
+        _update_job(db, job, status="completed", stage="completed", progress_pct=100)
+        _log(job_id, db, "Full direct processing pipeline completed successfully")
+        return {"status": "completed", "run_id": run_id}
+    except Exception as exc:
+        tb = traceback.format_exc()
+        _log(job_id, db, f"Direct pipeline error: {exc}\n{tb}", level="ERROR")
+        if job:
+            _update_job(db, job, status="failed", error_message=str(exc))
+        return {"status": "failed", "error": str(exc)}
     finally:
         db.close()

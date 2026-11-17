@@ -24,9 +24,9 @@ if not user:
 else:
     user_id = user[0]
 
-# Check if projects exist
-proj_count = cur.execute("SELECT count(*) FROM projects").fetchone()[0]
-if proj_count == 0:
+# Check if demo project exists
+demo_exists = cur.execute("SELECT id FROM projects WHERE id='proj-coastal-01'").fetchone()
+if not demo_exists:
     projects = [
         (
             "proj-coastal-01",
@@ -178,7 +178,7 @@ if proj_count == 0:
     ]
 
     cur.executemany(
-        "INSERT INTO jobs (id, project_id, job_type, status, progress_pct, error_message, celery_task_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO jobs (id, project_id, job_type, status, progress_pct, error_message, celery_task_id, retry_count, timeout_seconds, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 3600, ?, ?)",
         jobs
     )
 

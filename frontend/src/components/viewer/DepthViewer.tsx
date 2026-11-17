@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Layers } from "lucide-react";
+import { Layers, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 interface DepthViewerProps {
@@ -35,6 +35,7 @@ export function DepthViewer({
 }: DepthViewerProps) {
   const [viewMode, setViewMode] = useState<"side-by-side" | "depth" | "blend">("blend");
   const [blendOpacity, setBlendOpacity] = useState(65);
+  const [superClarity, setSuperClarity] = useState(true);
 
   // Depth Anything V2 Small is relative-only unless a metric calibration was fitted by
   // the training pipeline. Never present normalised relative values as metres.
@@ -77,32 +78,58 @@ export function DepthViewer({
           </Button>
         </div>
 
-        {viewMode === "blend" && (
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span>Blend Opacity: {blendOpacity}%</span>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={blendOpacity}
-              onChange={(e) => setBlendOpacity(Number(e.target.value))}
-              className="w-28 accent-emerald-500 h-1.5 bg-forest-950 rounded appearance-none cursor-pointer"
-            />
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setSuperClarity(!superClarity)}
+            className={cn(
+              "text-[11px] gap-1.5 transition-all",
+              superClarity && "bg-emerald-500/20 text-emerald-300 border-emerald-400/50 shadow-[0_0_10px_rgba(16,185,129,0.25)] font-bold"
+            )}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+            SUPER CLARITY {superClarity ? "4K [ON]" : "[OFF]"}
+          </Button>
+
+          {viewMode === "blend" && (
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span>Blend Opacity: {blendOpacity}%</span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={blendOpacity}
+                onChange={(e) => setBlendOpacity(Number(e.target.value))}
+                className="w-28 accent-emerald-500 h-1.5 bg-forest-950 rounded appearance-none cursor-pointer"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main Display Viewport */}
       {viewMode === "side-by-side" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 aspect-[16/9]">
           <div className="relative overflow-hidden rounded border border-emerald-500/20 bg-forest-950">
-            <img src={originalImage} alt="Original Aerial RGB" className="w-full h-full object-cover" />
+            <img
+              src={originalImage}
+              alt="Original Aerial RGB"
+              className={cn("w-full h-full object-cover transition-all", superClarity && "contrast-[1.08] brightness-[1.03]")}
+            />
             <span className="absolute bottom-2 left-2 px-2 py-0.5 text-[11px] bg-forest-950/80 rounded text-white border border-white/10">
               Original Nadir RGB
             </span>
           </div>
           <div className="relative overflow-hidden rounded border border-emerald-500/20 bg-forest-950">
-            <img src={depthMapUrl} alt="Estimated Depth Map" className="w-full h-full object-cover" />
+            <img
+              src={depthMapUrl}
+              alt="Estimated Depth Map"
+              className={cn(
+                "w-full h-full object-cover transition-all",
+                superClarity && "contrast-[1.18] brightness-[1.06] saturate-[1.12]"
+              )}
+            />
             <span className="absolute bottom-2 left-2 px-2 py-0.5 text-[11px] bg-forest-950/80 rounded text-emerald-300 border border-emerald-500/30">
               {modelLabel || "Depth Anything V2 Small"} · {isMetric ? "metric (calibrated)" : "relative depth"}
             </span>
@@ -114,14 +141,17 @@ export function DepthViewer({
           <img
             src={originalImage}
             alt="Aerial Base"
-            className="absolute inset-0 w-full h-full object-cover"
+            className={cn("absolute inset-0 w-full h-full object-cover", superClarity && "contrast-[1.08] brightness-[1.03]")}
           />
 
           {/* Depth Map Overlay with Opacity */}
           <img
             src={depthMapUrl}
             alt="Depth Map Overlay"
-            className="absolute inset-0 w-full h-full object-cover mix-blend-screen transition-opacity"
+            className={cn(
+              "absolute inset-0 w-full h-full object-cover mix-blend-screen transition-all",
+              superClarity && "contrast-[1.2] brightness-[1.08] saturate-[1.15]"
+            )}
             style={{
               opacity: viewMode === "depth" ? 1.0 : blendOpacity / 100,
             }}
