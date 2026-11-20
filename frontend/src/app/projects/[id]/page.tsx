@@ -277,6 +277,7 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
               projectName={project?.name}
               locationName={project?.location_name}
               plyUrl={reconResult?.pointcloud_ply_path}
+              modelUrl={reconResult?.mesh_obj_path}
             />
 
             {reconResult && (

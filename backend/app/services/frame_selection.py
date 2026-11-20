@@ -25,8 +25,8 @@ class SelectionConfig:
     min_sharpness: Optional[float] = None
     max_near_duplicate_count_per_cluster: int = 1
     motion_proxy_enabled: bool = True
-    scene_change_proxy_enabled: bool = True
-    motion_threshold: float = 25.0
+    scene_change_proxy_enabled: bool = False
+    motion_threshold: float = 1.0
     scene_change_threshold: float = 25.0
     keep_duplicate_representative: bool = True
 
@@ -205,5 +205,30 @@ def select_frames(
         except Exception:
             prev_gray = None
         prev_path = c.storage_path
+
+    if len(selected) < 2 and len(candidates) >= 2:
+        # Fallback to evenly spaced candidates to ensure downstream photogrammetry viability
+        selected = []
+        step = max(1, len(ordered) // min(len(ordered), 30))
+        for c in ordered[::step]:
+            selected.append({
+                "frame_id": c.frame_id,
+                "video_id": c.video_id,
+                "mission_id": c.mission_id,
+                "processing_run_id": c.processing_run_id,
+                "frame_index": c.frame_index,
+                "presentation_timestamp": c.presentation_timestamp,
+                "timestamp_seconds": c.timestamp_seconds,
+                "storage_path": c.storage_path,
+                "blur_score": c.blur_score,
+                "mean_luminance": c.mean_luminance,
+                "width": c.width,
+                "height": c.height,
+                "duplicate_status": c.duplicate_status,
+                "duplicate_hash": c.duplicate_hash,
+                "duplicate_of_frame_id": c.duplicate_of_frame_id,
+                "is_selected": True,
+                "selection_reason": "photogrammetry_coverage_fallback",
+            })
 
     return selected

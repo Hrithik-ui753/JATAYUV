@@ -231,6 +231,29 @@ async def upload_project_video(
     )
 
 
+@router.get(
+    "/projects/{project_id}/videos",
+    response_model=List[VideoResponse],
+)
+def list_project_videos(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = check_project_owner(project_id, db, current_user)
+    missions = db.query(Mission).filter(Mission.project_id == project_id).all()
+    mission_ids = [m.id for m in missions]
+    if not mission_ids:
+        return []
+    videos = (
+        db.query(Video)
+        .filter(Video.mission_id.in_(mission_ids))
+        .order_by(Video.created_at.desc())
+        .all()
+    )
+    return [_video_to_response(v) for v in videos]
+
+
 @router.post(
     "/missions/{mission_id}/videos",
     response_model=VideoUploadResponse,

@@ -31,6 +31,7 @@ class VideoUploadResponse(BaseModel):
 
 
 class VideoResponse(VideoUploadResponse):
+    storage_path: Optional[str] = None
     duration_seconds: Optional[int] = None
     width: Optional[int] = None
     height: Optional[int] = None

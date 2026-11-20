@@ -442,10 +442,10 @@ class PhotogrammetryService:
                         curr_pts2d: List[Any] = []
                         for p_idx in range(pts3d_h.shape[1]):
                             pt_w = pts3d_h[:, p_idx]
-                            # Keep points in front of cameras
+                            # Keep points in front of cameras within plausible aerial range
                             p_c1 = curr_R_w2c @ pt_w + curr_t_w2c
                             p_c2 = next_R_w2c @ pt_w + next_t_w2c
-                            if p_c1[2] > 0.1 and p_c2[2] > 0.1:
+                            if 0.5 < p_c1[2] < 200.0 and 0.5 < p_c2[2] < 200.0:
                                 points3D[p3d_counter] = pt_w.tolist()
                                 curr_pts2d.append((pts_curr[p_idx][0], pts_curr[p_idx][1], p3d_counter))
                                 p3d_counter += 1
@@ -538,10 +538,13 @@ class PhotogrammetryService:
                 if p3d_id in points3D_dict:
                     p_w = np.array(points3D_dict[p3d_id], dtype=np.float64)
                     z_c = (R_w2c @ p_w + t_w2c)[2]
-                    if z_c > 0.1:
+                    if 0.5 < z_c < 150.0:
                         all_tie_scales.append(z_c)
 
-        global_ref_scale = float(np.median(all_tie_scales)) * 12.0 if len(all_tie_scales) >= 5 else 35.0
+        if len(all_tie_scales) >= 5:
+            global_ref_scale = float(np.clip(np.median(all_tie_scales), 15.0, 80.0))
+        else:
+            global_ref_scale = 35.0
         registered_images = 0
 
         # Stage 2: Monocular Depth Inference & Pinhole Unprojection
@@ -584,13 +587,15 @@ class PhotogrammetryService:
                 if p3d_id in points3D_dict:
                     p_w = np.array(points3D_dict[p3d_id], dtype=np.float64)
                     z_c = (R_w2c @ p_w + t_w2c)[2]
-                    if z_c > 0.05 and 0 <= int(v) < h and 0 <= int(u) < w:
+                    if 0.5 < z_c < 150.0 and 0 <= int(v) < h and 0 <= int(u) < w:
                         d_pred = rel_depth[int(v), int(u)]
-                        if d_pred > 0.001:
-                            local_scales.append(z_c / d_pred)
+                        if d_pred > 0.01:
+                            ratio = z_c / d_pred
+                            if 5.0 <= ratio <= 150.0:
+                                local_scales.append(ratio)
 
             if len(local_scales) >= 5:
-                scale_factor = 0.5 * float(np.median(local_scales)) + 0.5 * global_ref_scale
+                scale_factor = float(np.clip(0.5 * np.median(local_scales) + 0.5 * global_ref_scale, 15.0, 100.0))
             else:
                 scale_factor = global_ref_scale
 

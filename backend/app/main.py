@@ -25,6 +25,8 @@ from backend.app.api.v1 import (
     missions,
 )
 from backend.app.api.v1.routers import video_processing_router
+from backend.app.api.v1.spatial_intelligence import router as spatial_intelligence_router
+from backend.app.api.v1.digital_twin import router as digital_twin_router
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +54,11 @@ def _warn_if_schema_unmigrated() -> None:
 
 
 _warn_if_schema_unmigrated()
+
+# Ensure all database tables exist across models
+import backend.app.models
+from backend.app.core.database import Base
+Base.metadata.create_all(bind=engine)
 
 # Retain the existing compatibility schema check.
 ensure_depth_result_schema()
@@ -113,6 +120,8 @@ app.include_router(
     prefix=settings.API_V1_STR,
 )
 app.include_router(video_processing_router, prefix=settings.API_V1_STR)
+app.include_router(spatial_intelligence_router, prefix=settings.API_V1_STR)
+app.include_router(digital_twin_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/health", tags=["Platform"])

@@ -1,5 +1,6 @@
-﻿import os
+import os
 import json
+import uuid
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
@@ -7,6 +8,7 @@ from sqlalchemy.orm import Session
 from backend.app.core.config import settings
 from backend.app.core.database import get_db, db as scoped_db
 from backend.app.models.image import Image
+from backend.app.models.frame import Frame
 from backend.app.models.project import Project
 from backend.app.models.job import Job
 from backend.app.models.mission import Mission
@@ -61,11 +63,111 @@ def trigger_3d_reconstruction(
         images = db.query(Image).filter(Image.project_id == project.id).all()
 
     if not images:
+        # Check if frames were extracted for any video belonging to this mission/project
+        mission = db.query(Mission).filter(Mission.project_id == project.id).first()
+        if mission:
+            frames = db.query(Frame).filter(Frame.mission_id == mission.id).all()
+            for f in frames:
+                if f.storage_path and os.path.isfile(f.storage_path):
+                    existing = (
+                        db.query(Image)
+                        .filter(Image.project_id == project.id, Image.file_path == f.storage_path)
+                        .first()
+                    )
+                    if not existing:
+                        img = Image(
+                            id=str(uuid.uuid4()),
+                            project_id=project.id,
+                            filename=f"frame_{f.frame_index:04d}.jpg",
+                            file_path=f.storage_path,
+                            thumbnail_path=f.storage_path,
+                            file_size_bytes=os.path.getsize(f.storage_path),
+                            width=f.width or 1920,
+                            height=f.height or 1080,
+                            format="JPEG",
+                        )
+                        db.add(img)
+            db.commit()
+            images = db.query(Image).filter(Image.project_id == project.id).all()
+
+        # If still no images, auto-extract keyframes across the complete uploaded drone video
+        if not images:
+            from backend.app.models.video import Video
+            import cv2
+
+            video = None
+            if mission:
+                video = (
+                    db.query(Video)
+                    .filter(Video.mission_id == mission.id)
+                    .order_by(Video.created_at.desc())
+                    .first()
+                )
+            if video and video.storage_path and os.path.isfile(video.storage_path):
+                out_dir = os.path.join(settings.UPLOAD_DIR, "extracted_frames", project.id)
+                os.makedirs(out_dir, exist_ok=True)
+                cap = cv2.VideoCapture(video.storage_path)
+                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 1920
+                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 1080
+
+                target_count = 24
+                if total_frames > 0:
+                    step = max(1, total_frames // target_count)
+                    sampled_indices = [i for i in range(0, total_frames, step)][:target_count]
+                else:
+                    sampled_indices = [0]
+
+                for f_idx in sampled_indices:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, f_idx)
+                    ret, frame_img = cap.read()
+                    if ret and frame_img is not None:
+                        frame_filename = f"frame_{f_idx:05d}.jpg"
+                        frame_path = os.path.join(out_dir, frame_filename)
+                        cv2.imwrite(frame_path, frame_img, [cv2.IMWRITE_JPEG_QUALITY, 95])
+
+                        img = Image(
+                            id=str(uuid.uuid4()),
+                            project_id=project.id,
+                            filename=frame_filename,
+                            file_path=frame_path,
+                            thumbnail_path=frame_path,
+                            file_size_bytes=os.path.getsize(frame_path),
+                            width=width,
+                            height=height,
+                            format="JPEG",
+                        )
+                        db.add(img)
+
+                        if mission:
+                            frm = Frame(
+                                id=str(uuid.uuid4()),
+                                mission_id=mission.id,
+                                video_id=video.id,
+                                frame_index=f_idx,
+                                presentation_timestamp=f_idx / fps,
+                                timestamp_seconds=f_idx / fps,
+                                storage_path=frame_path,
+                                width=width,
+                                height=height,
+                                quality_status="valid",
+                                is_selected=True,
+                            )
+                            db.add(frm)
+                cap.release()
+                db.commit()
+                images = db.query(Image).filter(Image.project_id == project.id).all()
+
+    if not images:
         raise HTTPException(
             status_code=400,
             detail={
                 "status": "invalid_input",
-                "message": "Cannot run 3D reconstruction on a project with no uploaded aerial images",
+                "message": (
+                    "No aerial images found for this mission. Please upload at least 2 aerial images, "
+                    "or upload a drone video and click 'Process Video' to extract frames before running 3D reconstruction."
+                ),
             },
         )
 

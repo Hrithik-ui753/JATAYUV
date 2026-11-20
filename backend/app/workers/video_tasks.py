@@ -300,6 +300,7 @@ def extract_frames_task(
                 .first()
             )
             if existing:
+                existing.processing_run_id = run_id
                 frame_objs.append(existing)
                 continue
             frame = Frame(
@@ -367,6 +368,13 @@ def analyze_quality_task(
             .order_by(Frame.frame_index)
             .all()
         )
+        if not frames:
+            frames = (
+                db.query(Frame)
+                .filter(Frame.video_id == video_id)
+                .order_by(Frame.frame_index)
+                .all()
+            )
         if not frames:
             _log(job_id, db, "No frames found for quality analysis", level="WARN")
             _update_job(db, job, stage="duplicate_detection", status="queued", progress_pct=70)
@@ -450,6 +458,13 @@ def detect_duplicates_task(
             .order_by(Frame.frame_index)
             .all()
         )
+        if not frames:
+            frames = (
+                db.query(Frame)
+                .filter(Frame.video_id == video_id)
+                .order_by(Frame.frame_index)
+                .all()
+            )
         if not frames:
             _log(job_id, db, "No frames found for duplicate detection", level="WARN")
             _update_job(db, job, stage="frame_selection", status="queued", progress_pct=80)
@@ -542,6 +557,13 @@ def select_frames_task(
             .order_by(Frame.frame_index)
             .all()
         )
+        if not frames:
+            frames = (
+                db.query(Frame)
+                .filter(Frame.video_id == video_id)
+                .order_by(Frame.frame_index)
+                .all()
+            )
         if not frames:
             _log(job_id, db, "No frames found for selection", level="WARN")
             _update_job(db, job, stage="gps_association", status="queued", progress_pct=90)
@@ -642,6 +664,13 @@ def associate_gps_task(
             .order_by(Frame.frame_index)
             .all()
         )
+        if not frames:
+            frames = (
+                db.query(Frame)
+                .filter(Frame.video_id == video_id)
+                .order_by(Frame.frame_index)
+                .all()
+            )
         if not frames:
             _log(job_id, db, "No frames found for GPS association", level="WARN")
             _update_job(db, job, status="completed", progress_pct=100)
@@ -974,7 +1003,18 @@ def run_pipeline_direct(
                 .order_by(Frame.frame_index)
                 .all()
             )
-            target_frames = [f for f in frames if f.is_selected] or frames
+            if not frames:
+                frames = (
+                    db.query(Frame)
+                    .filter(Frame.video_id == video_id)
+                    .order_by(Frame.frame_index)
+                    .all()
+                )
+            target_frames = [f for f in frames if f.is_selected]
+            if len(target_frames) < 2 and len(frames) >= 2:
+                target_frames = frames
+            elif not target_frames:
+                target_frames = frames
             registered_count = 0
             for f in target_frames:
                 existing_img = (

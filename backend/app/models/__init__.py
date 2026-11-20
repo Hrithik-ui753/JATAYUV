@@ -59,6 +59,13 @@ from backend.app.services.recon.models import (
     ReconstructionQualityReport,
 )
 
+from backend.app.models.digital_twin import (
+    Corridor,
+    CorridorAsset,
+    InspectionFindingVerification,
+    InspectionTask,
+)
+
 
 __all__ = [
     "Base",
@@ -101,5 +108,9 @@ __all__ = [
     "MeshArtifact",
     "TextureArtifact",
     "ReconstructionQualityReport",
+    "Corridor",
+    "CorridorAsset",
+    "InspectionFindingVerification",
+    "InspectionTask",
 ]
 
