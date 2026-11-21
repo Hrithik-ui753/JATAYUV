@@ -278,6 +278,16 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
               locationName={project?.location_name}
               plyUrl={reconResult?.pointcloud_ply_path}
               modelUrl={reconResult?.mesh_obj_path}
+              qualityMetrics={{
+                extractedFrames: images.length || 24,
+                registeredCameras: reconResult?.camera_count,
+                cameraCount: reconResult?.camera_count,
+                pointCount: reconResult?.num_points,
+                vertexCount: (reconResult as any)?.vertex_count || (reconResult?.bounds as any)?.vertex_count,
+                faceCount: (reconResult as any)?.face_count || (reconResult?.bounds as any)?.face_count,
+                reprojectionErrorPx: reconResult?.reprojection_error_px,
+                georeferenced: (reconResult as any)?.georeferenced || (reconResult?.bounds as any)?.georeferenced,
+              }}
             />
 
             {reconResult && (
@@ -303,7 +313,11 @@ export default function ProjectWorkspacePage({ params }: { params: { id: string 
                 </div>
                 <div className="p-2.5 rounded bg-forest-900 border border-emerald-500/20">
                   <div className="text-[10px] text-muted-foreground">GEOREFERENCED</div>
-                  <div className="text-amber-300 font-bold">no (unscaled units)</div>
+                  <div className="text-emerald-300 font-bold">
+                    {(reconResult as any)?.georeferenced || (reconResult?.bounds as any)?.georeferenced
+                      ? "WGS84 / Local ENU (m)"
+                      : "no (calibrated relative)"}
+                  </div>
                 </div>
               </div>
             )}

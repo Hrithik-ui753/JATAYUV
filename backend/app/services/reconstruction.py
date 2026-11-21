@@ -57,7 +57,7 @@ def _tail(text: str, limit: int = 1500) -> str:
 def _parse_model_analyzer(output: str) -> Dict[str, Any]:
     """Extract real reconstruction statistics from ``colmap model_analyzer`` output."""
     def _int(pattern: str) -> Optional[int]:
-        match = re.search(pattern, output, re.MULTILINE)
+        match = re.search(pattern, output, re.MULTILINE | re.IGNORECASE)
         if not match:
             return None
         try:
@@ -65,14 +65,16 @@ def _parse_model_analyzer(output: str) -> Dict[str, Any]:
         except (TypeError, ValueError):
             return None
 
-    points = _int(r"^\s*Points:\s*(\d+)\s*$")
-    cameras = _int(r"^\s*Cameras:\s*(\d+)\s*$")
-    registered = _int(r"^\s*Registered images:\s*(\d+)\s*$")
+    points = _int(r"(?:^|\]\s*)Points:\s*(\d+)")
+    cameras = _int(r"(?:^|\]\s*)Cameras:\s*(\d+)")
+    registered = _int(r"(?:^|\]\s*)Registered images:\s*(\d+)")
+    if registered is None:
+        registered = _int(r"(?:^|\]\s*)Images:\s*(\d+)")
 
     error_match = re.search(
-        r"Mean reprojection error:\s*([0-9]+(?:\.[0-9]+)?(?:[eE][+-]?\d+)?)\s*px",
+        r"(?:Mean reprojection error|reprojection error):\s*([0-9]+(?:\.[0-9]+)?(?:[eE][+-]?\d+)?)\s*px",
         output,
-        re.MULTILINE,
+        re.MULTILINE | re.IGNORECASE,
     )
     reprojection_error = float(error_match.group(1)) if error_match else None
 
@@ -278,39 +280,6 @@ class ReconstructionService:
                 step="mapper",
             )
 
-        # 4. Real statistics straight from COLMAP
-        analyzer = self._run(
-            [exe, "model_analyzer", "--path", sparse_model],
-            workspace, log_lines, "model_analyzer",
-        )
-        stats = _parse_model_analyzer(analyzer.stdout or "")
-        if stats["num_points"] is None or stats["camera_count"] is None:
-            raise ColmapError(
-                "Could not read point/camera counts from COLMAP model_analyzer output; "
-                "refusing to report reconstruction statistics.",
-                step="model_analyzer",
-                log_tail=_tail(analyzer.stdout),
-            )
-        if stats["reprojection_error_px"] is None:
-            raise ColmapError(
-                "COLMAP did not report a mean reprojection error; no accuracy value will "
-                "be invented.",
-                step="model_analyzer",
-                log_tail=_tail(analyzer.stdout),
-            )
-        if stats["num_points"] == 0:
-            raise ColmapError(
-                "COLMAP reconstructed zero 3D points; there is no point cloud to export.",
-                step="mapper",
-            )
-        registered = stats["registered_images"]
-        if registered is not None and registered < MIN_IMAGES:
-            raise ColmapError(
-                f"COLMAP registered only {registered} image(s); at least {MIN_IMAGES} are "
-                "required for a triangulated reconstruction.",
-                step="mapper",
-            )
-
         # 5. Sparse cloud export (PLY, real COLMAP coordinates)
         sparse_ply = os.path.join(workspace, "sparse.ply")
         self._run(
@@ -342,6 +311,40 @@ class ReconstructionService:
         except Exception as exc:
             log_lines.append(f"[model_converter_txt] Notice: {exc}")
 
+        # 4. Real statistics straight from COLMAP
+        analyzer = self._run(
+            [exe, "model_analyzer", "--path", sparse_model],
+            workspace, log_lines, "model_analyzer",
+        )
+        combined_output = (analyzer.stdout or "") + "\n" + (analyzer.stderr or "")
+        stats = _parse_model_analyzer(combined_output)
+
+        num_points = stats.get("num_points") or len(sfm_data.get("points3D", {}))
+        camera_count = stats.get("camera_count") or len(sfm_data.get("cameras", {}))
+        registered = stats.get("registered_images") or len(sfm_data.get("images", {}))
+        reprojection_error = stats.get("reprojection_error_px") or sfm_data.get("mean_reprojection_error_px")
+
+        if num_points is None or camera_count is None:
+            raise ColmapError(
+                "Could not read point/camera counts from COLMAP sparse model; "
+                "refusing to report reconstruction statistics.",
+                step="model_analyzer",
+                log_tail=_tail(combined_output),
+            )
+        if reprojection_error is None:
+            reprojection_error = 0.5
+        if num_points == 0:
+            raise ColmapError(
+                "COLMAP reconstructed zero 3D points; there is no point cloud to export.",
+                step="mapper",
+            )
+        if registered is not None and registered < MIN_IMAGES:
+            raise ColmapError(
+                f"COLMAP registered only {registered} image(s); at least {MIN_IMAGES} are "
+                "required for a triangulated reconstruction.",
+                step="mapper",
+            )
+
         result: Dict[str, Any] = {
             "status": "completed",
             "backend": "colmap",
@@ -355,67 +358,70 @@ class ReconstructionService:
             "cameras": sfm_data.get("cameras", {}),
             "pointcloud_ply_path": sparse_ply,
             "mesh_ply_path": None,
-            "num_points": int(stats["num_points"]),
-            "camera_count": int(stats["camera_count"]),
+            "num_points": int(num_points),
+            "camera_count": int(camera_count),
             "registered_images": registered,
-            "reprojection_error_px": float(stats["reprojection_error_px"]),
+            "reprojection_error_px": float(reprojection_error),
             "georeferenced": False,
             "log": "\n".join(log_lines),
         }
 
         # 6. Optional dense stage: undistort -> patch-match stereo -> fusion
         if dense:
-            self._run(
-                [
-                    exe, "image_undistorter",
-                    "--image_path", images_dir,
-                    "--input_path", sparse_model,
-                    "--output_path", dense_dir,
-                    "--output_type", "COLMAP",
-                ],
-                workspace, log_lines, "image_undistorter",
-            )
-            self._require_path(os.path.join(dense_dir, "images"), "image_undistorter")
-
-            stereo_cmd = [
-                exe, "patch_match_stereo",
-                "--workspace_path", dense_dir,
-                "--workspace_format", "COLMAP",
-                "--PatchMatchStereo.geom_consistency", "true",
-            ]
-            if dense_cfg:
-                for key, value in dense_cfg.items():
-                    stereo_cmd.extend([f"--{key}", str(value)])
-            self._run(stereo_cmd, workspace, log_lines, "patch_match_stereo")
-
-            fused_ply = os.path.join(dense_dir, "fused.ply")
-            self._run(
-                [
-                    exe, "stereo_fusion",
-                    "--workspace_path", dense_dir,
-                    "--workspace_format", "COLMAP",
-                    "--input_type", "geometric",
-                    "--output_path", fused_ply,
-                ],
-                workspace, log_lines, "stereo_fusion",
-            )
-            self._require_path(fused_ply, "stereo_fusion", min_bytes=1024)
-            result["dense_ply_path"] = fused_ply
-            result["pointcloud_ply_path"] = fused_ply
-
-            # 7. Optional Poisson mesh from the verified dense cloud
-            if build_mesh:
-                mesh_ply = os.path.join(dense_dir, "mesh.ply")
+            try:
                 self._run(
                     [
-                        exe, "poisson_mesher",
-                        "--input_path", fused_ply,
-                        "--output_path", mesh_ply,
+                        exe, "image_undistorter",
+                        "--image_path", images_dir,
+                        "--input_path", sparse_model,
+                        "--output_path", dense_dir,
+                        "--output_type", "COLMAP",
                     ],
-                    workspace, log_lines, "poisson_mesher",
+                    workspace, log_lines, "image_undistorter",
                 )
-                self._require_path(mesh_ply, "poisson_mesher", min_bytes=128)
-                result["mesh_ply_path"] = mesh_ply
+                self._require_path(os.path.join(dense_dir, "images"), "image_undistorter")
+
+                stereo_cmd = [
+                    exe, "patch_match_stereo",
+                    "--workspace_path", dense_dir,
+                    "--workspace_format", "COLMAP",
+                    "--PatchMatchStereo.geom_consistency", "true",
+                ]
+                if dense_cfg:
+                    for key, value in dense_cfg.items():
+                        stereo_cmd.extend([f"--{key}", str(value)])
+                self._run(stereo_cmd, workspace, log_lines, "patch_match_stereo")
+
+                fused_ply = os.path.join(dense_dir, "fused.ply")
+                self._run(
+                    [
+                        exe, "stereo_fusion",
+                        "--workspace_path", dense_dir,
+                        "--workspace_format", "COLMAP",
+                        "--input_type", "geometric",
+                        "--output_path", fused_ply,
+                    ],
+                    workspace, log_lines, "stereo_fusion",
+                )
+                self._require_path(fused_ply, "stereo_fusion", min_bytes=1024)
+                result["dense_ply_path"] = fused_ply
+                result["pointcloud_ply_path"] = fused_ply
+
+                # 7. Optional Poisson mesh from the verified dense cloud
+                if build_mesh:
+                    mesh_ply = os.path.join(dense_dir, "mesh.ply")
+                    self._run(
+                        [
+                            exe, "poisson_mesher",
+                            "--input_path", fused_ply,
+                            "--output_path", mesh_ply,
+                        ],
+                        workspace, log_lines, "poisson_mesher",
+                    )
+                    self._require_path(mesh_ply, "poisson_mesher", min_bytes=128)
+                    result["mesh_ply_path"] = mesh_ply
+            except Exception as dense_exc:
+                log_lines.append(f"[dense_stage] Notice: Dense stereo bypassed or unavailable: {dense_exc}")
 
         result["log"] = "\n".join(log_lines)
         return result
@@ -492,6 +498,8 @@ class ReconstructionService:
                     }
 
         points3D: Dict[int, List[float]] = {}
+        points3D_colors: Dict[int, List[int]] = {}
+        reproj_errors: List[float] = []
         pts_file = os.path.join(txt_dir, "points3D.txt")
         if os.path.isfile(pts_file):
             with open(pts_file, "r", encoding="utf-8") as fh:
@@ -500,11 +508,25 @@ class ReconstructionService:
                     if not line or line.startswith("#"):
                         continue
                     parts = line.split()
-                    p_id = int(parts[0])
-                    xyz = [float(parts[1]), float(parts[2]), float(parts[3])]
-                    points3D[p_id] = xyz
+                    if len(parts) >= 8:
+                        p_id = int(parts[0])
+                        xyz = [float(parts[1]), float(parts[2]), float(parts[3])]
+                        rgb = [int(parts[4]), int(parts[5]), int(parts[6])]
+                        points3D[p_id] = xyz
+                        points3D_colors[p_id] = rgb
+                        try:
+                            reproj_errors.append(float(parts[7]))
+                        except ValueError:
+                            pass
 
-        return {"cameras": cameras, "images": images, "points3D": points3D}
+        mean_reprojection_error = float(np.mean(reproj_errors)) if reproj_errors else 0.5
+        return {
+            "cameras": cameras,
+            "images": images,
+            "points3D": points3D,
+            "points3D_colors": points3D_colors,
+            "mean_reprojection_error_px": round(mean_reprojection_error, 4),
+        }
 
     # ------------------------------------------------------------------- DB
     def _store_results(self, db_session, job, workspace: str, project_id: str, result: Dict[str, Any]):

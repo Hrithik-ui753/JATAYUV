@@ -18,7 +18,12 @@ class ReconstructionResponse(BaseModel):
     num_points: int
     camera_count: int
     reprojection_error_px: float
-    bounds: Optional[Dict[str, float]] = None
+    bounds: Optional[Dict[str, Any]] = None
+    backend: Optional[str] = None
+    status: Optional[str] = None
+    georeferenced: Optional[bool] = None
+    vertex_count: Optional[int] = None
+    face_count: Optional[int] = None
     created_at: datetime
 
     class Config:

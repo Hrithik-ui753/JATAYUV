@@ -120,12 +120,29 @@ def trigger_3d_reconstruction(
                     sampled_indices = [0]
 
                 for f_idx in sampled_indices:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, f_idx)
-                    ret, frame_img = cap.read()
-                    if ret and frame_img is not None:
-                        frame_filename = f"frame_{f_idx:05d}.jpg"
+                    # Select sharpest frame around f_idx to reject motion blur
+                    best_img = None
+                    best_blur = -1.0
+                    best_f_idx = f_idx
+                    candidate_offsets = [0, 1, -1, 2, -2]
+                    for offset in candidate_offsets:
+                        cand_idx = max(0, min(total_frames - 1, f_idx + offset))
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, cand_idx)
+                        r, cand_img = cap.read()
+                        if r and cand_img is not None:
+                            gray = cv2.cvtColor(cand_img, cv2.COLOR_BGR2GRAY)
+                            score = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+                            if score > best_blur:
+                                best_blur = score
+                                best_img = cand_img
+                                best_f_idx = cand_idx
+                            if score > 50.0:  # Sufficiently sharp
+                                break
+
+                    if best_img is not None:
+                        frame_filename = f"frame_{best_f_idx:05d}.jpg"
                         frame_path = os.path.join(out_dir, frame_filename)
-                        cv2.imwrite(frame_path, frame_img, [cv2.IMWRITE_JPEG_QUALITY, 95])
+                        cv2.imwrite(frame_path, best_img, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
                         img = Image(
                             id=str(uuid.uuid4()),
@@ -145,13 +162,13 @@ def trigger_3d_reconstruction(
                                 id=str(uuid.uuid4()),
                                 mission_id=mission.id,
                                 video_id=video.id,
-                                frame_index=f_idx,
-                                presentation_timestamp=f_idx / fps,
-                                timestamp_seconds=f_idx / fps,
+                                frame_index=best_f_idx,
+                                presentation_timestamp=best_f_idx / fps,
+                                timestamp_seconds=best_f_idx / fps,
                                 storage_path=frame_path,
                                 width=width,
                                 height=height,
-                                quality_status="valid",
+                                quality_status="valid" if best_blur >= 30.0 else "blurry",
                                 is_selected=True,
                             )
                             db.add(frm)
@@ -197,12 +214,30 @@ def trigger_3d_reconstruction(
     mesh_path = os.path.join(settings.RECONSTRUCTION_DIR, f"mesh_{project.id}.obj")
     dsm_path = os.path.join(settings.RECONSTRUCTION_DIR, f"dsm_{project.id}.tif")
 
+    companion_telemetry = None
+    mission = db.query(Mission).filter(Mission.project_id == project.id).first()
+    if mission:
+        from backend.app.models.video import Video
+        vid = db.query(Video).filter(Video.mission_id == mission.id).order_by(Video.created_at.desc()).first()
+        if vid and vid.storage_path:
+            v_dir = os.path.dirname(vid.storage_path)
+            v_base = os.path.splitext(os.path.basename(vid.storage_path))[0]
+            candidates = [
+                os.path.join(v_dir, f"{v_base}_telemetry.csv"),
+                os.path.join(v_dir, f"{v_base.split('_')[0]}_telemetry.csv"),
+            ]
+            for c in candidates:
+                if os.path.isfile(c):
+                    companion_telemetry = c
+                    break
+
     try:
         res = photogrammetry_service.reconstruct_3d_pointcloud(
             image_paths=image_paths,
             output_ply_path=ply_path,
             output_mesh_path=mesh_path,
             output_dsm_path=dsm_path,
+            telemetry_path=companion_telemetry,
         )
     except ReconstructionUnavailable as exc:
         job.status = "failed"
@@ -272,6 +307,11 @@ def trigger_3d_reconstruction(
         camera_count=recon_record.camera_count,
         reprojection_error_px=recon_record.reprojection_error_px,
         bounds=res["bounds"],
+        backend="colmap_dpt",
+        status="completed",
+        georeferenced=res.get("georeferenced", False),
+        vertex_count=res.get("vertex_count"),
+        face_count=res.get("face_count"),
         created_at=recon_record.created_at,
     )
 
@@ -288,9 +328,15 @@ def get_3d_reconstruction(
         raise HTTPException(status_code=404, detail="3D reconstruction result not found for this project")
     
     bounds = None
+    georef = False
+    v_count = None
+    f_count = None
     if recon.bounds_json:
         try:
             bounds = json.loads(recon.bounds_json)
+            georef = bounds.get("georeferenced", False)
+            v_count = bounds.get("vertex_count")
+            f_count = bounds.get("face_count")
         except Exception:
             pass
 
@@ -305,6 +351,11 @@ def get_3d_reconstruction(
         camera_count=recon.camera_count,
         reprojection_error_px=recon.reprojection_error_px,
         bounds=bounds,
+        backend="colmap_dpt",
+        status="completed",
+        georeferenced=georef,
+        vertex_count=v_count,
+        face_count=f_count,
         created_at=recon.created_at,
     )
 

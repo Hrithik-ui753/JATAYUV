@@ -18,7 +18,7 @@
   "checkpoint_sha256": "715fade13be8f229f8a70cc02066f656f2423a59effd0579197bbf57860e1378",
   "checkpoint_epoch": null,
   "input_size": 518,
-  "inference_ms": 936.83,
+  "inference_ms": 777.8,
   "device": "cpu",
   "altitude_m_used": false,
   "notes": "Relative inverse depth from Depth Anything V2 Small. Pixel values are normalised per image and have no metric scale."

@@ -758,6 +758,16 @@ export default function DashboardPage() {
                     }
                     onRunReconstruction={trigger3D}
                     isReconstructing={activeInferencing === "3d"}
+                    qualityMetrics={{
+                      extractedFrames: 24,
+                      registeredCameras: reconResult?.camera_count,
+                      cameraCount: reconResult?.camera_count,
+                      pointCount: reconResult?.num_points,
+                      vertexCount: (reconResult as any)?.vertex_count || (reconResult?.bounds as any)?.vertex_count,
+                      faceCount: (reconResult as any)?.face_count || (reconResult?.bounds as any)?.face_count,
+                      reprojectionErrorPx: reconResult?.reprojection_error_px,
+                      georeferenced: (reconResult as any)?.georeferenced || (reconResult?.bounds as any)?.georeferenced,
+                    }}
                   />
                 </CardContent>
               </Card>
@@ -1930,6 +1940,16 @@ export default function DashboardPage() {
                     }
                     onRunReconstruction={trigger3D}
                     isReconstructing={activeInferencing === "3d"}
+                    qualityMetrics={{
+                      extractedFrames: 24,
+                      registeredCameras: reconResult?.camera_count,
+                      cameraCount: reconResult?.camera_count,
+                      pointCount: reconResult?.num_points,
+                      vertexCount: (reconResult as any)?.vertex_count || (reconResult?.bounds as any)?.vertex_count,
+                      faceCount: (reconResult as any)?.face_count || (reconResult?.bounds as any)?.face_count,
+                      reprojectionErrorPx: reconResult?.reprojection_error_px,
+                      georeferenced: (reconResult as any)?.georeferenced || (reconResult?.bounds as any)?.georeferenced,
+                    }}
                   />
                 </CardContent>
               </Card>

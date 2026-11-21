@@ -69,7 +69,7 @@ function createSharpPointTexture(): THREE.Texture {
 export function PointCloudViewer({ plyUrl, className }: PointCloudViewerProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [pointSize, setPointSize] = useState<number>(0.05);
-  const [colorMode, setColorMode] = useState<"elevation" | "rgb">("elevation");
+  const [colorMode, setColorMode] = useState<"elevation" | "rgb">("rgb");
   const [isRotating, setIsRotating] = useState<boolean>(true);
   const [status, setStatus] = useState<ViewerStatus>("empty");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -212,7 +212,12 @@ export function PointCloudViewer({ plyUrl, className }: PointCloudViewerProps) {
       sourceColorsRef.current = stored;
       setHasVertexColors(Boolean(stored));
 
-      geo.setAttribute("color", new THREE.BufferAttribute(elevationColors, 3));
+      // Use true natural aerial drone RGB colors when present; fall back to elevation gradient if uncolored
+      if (stored) {
+        geo.setAttribute("color", new THREE.BufferAttribute(stored, 3));
+      } else {
+        geo.setAttribute("color", new THREE.BufferAttribute(elevationColors, 3));
+      }
       geo.computeBoundingSphere();
 
       const sharpTex = createSharpPointTexture();
